@@ -91,8 +91,21 @@ pyright <files>
 ### Agent System
 
 This project uses a multi-agent system with:
-- **Primary agents**: Build, Plan (user-facing)
-- **Subagents**: Specialized agents for specific tasks (orchestrator, implementer, code-review, etc.)
+- **Primary agent**: orchestrator (coordinates tasks and delegates to subagents)
+- **Subagents**: Specialized agents for specific tasks:
+  - implementer: Code generation with Python 3.13+, typing, and tests
+  - code-review: Read-only reviewer for validation
+  - planning: Architecture and task planning
+  - web-research: External documentation research
+  - file-navigator: Fast codebase exploration
+  - executor: Runs commands/tests/linters
+  - security-review: Security-focused review
+  - docs: Documentation writing/updating
+  - compliance: Policy/standards alignment
+  - diagnostics: Failure analysis
+  - refactoring: Structure/maintainability improvements
+  - integration: Cross-cutting integration work
+  - communication: PR descriptions, changelogs, etc.
 - Agent configurations in `opencode.json` define their behavior, tools, and permissions
 
 ## Markdown Linting
