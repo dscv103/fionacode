@@ -72,22 +72,24 @@ def evaluate(payload: Dict[str, Any]) -> Dict[str, Any]:
         value=tests_passed,
         threshold=True,
         reason=(
-            "tests_passed must be true"
-            if tests_passed is not True
-            else "tests passed"
+            "tests_passed must be true" if tests_passed is not True else "tests passed"
         ),
     )
 
     coverage_ok = CriterionResult(
-        met=(branch_coverage is not None and branch_coverage > BRANCH_COVERAGE_THRESHOLD),
+        met=(
+            branch_coverage is not None and branch_coverage > BRANCH_COVERAGE_THRESHOLD
+        ),
         value=branch_coverage,
         threshold=f"> {BRANCH_COVERAGE_THRESHOLD}",
         reason=(
             "branch_coverage must be provided"
             if branch_coverage is None
-            else f"branch_coverage must be > {BRANCH_COVERAGE_THRESHOLD}"
-            if branch_coverage <= BRANCH_COVERAGE_THRESHOLD
-            else "branch coverage above threshold"
+            else (
+                f"branch_coverage must be > {BRANCH_COVERAGE_THRESHOLD}"
+                if branch_coverage <= BRANCH_COVERAGE_THRESHOLD
+                else "branch coverage above threshold"
+            )
         ),
     )
 
@@ -109,9 +111,11 @@ def evaluate(payload: Dict[str, Any]) -> Dict[str, Any]:
         reason=(
             "critical_issues_count must be provided"
             if critical_issues_count is None
-            else "no critical issues"
-            if critical_issues_count == 0
-            else "critical issues must be 0"
+            else (
+                "no critical issues"
+                if critical_issues_count == 0
+                else "critical issues must be 0"
+            )
         ),
     )
 
@@ -138,11 +142,7 @@ def evaluate(payload: Dict[str, Any]) -> Dict[str, Any]:
 
     decision = "approve" if met_count == 4 else "iterate"
 
-    summary = (
-        "Exit criteria met"
-        if decision == "approve"
-        else "Exit criteria NOT met"
-    )
+    summary = "Exit criteria met" if decision == "approve" else "Exit criteria NOT met"
 
     return {
         "ok": True,
@@ -186,10 +186,7 @@ def main() -> int:
         sys.stdout.write("\n")
         return 0
     except Exception as exc:
-        sys.stdout.write(
-            json.dumps({"ok": False, "error": str(exc)})
-            + "\n"
-        )
+        sys.stdout.write(json.dumps({"ok": False, "error": str(exc)}) + "\n")
         return 0
 
 

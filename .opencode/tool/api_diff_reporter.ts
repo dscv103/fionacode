@@ -1,38 +1,39 @@
-import { tool } from "@opencode-ai/plugin"
-import { spawn } from "node:child_process"
+import { tool } from "@opencode-ai/plugin";
+import { spawn } from "node:child_process";
+import process from "node:process";
 
 type APISymbol = {
-  name: string
-  type: "class" | "function" | "variable" | "constant"
-  signature?: string
-  module: string
-  line: number
-}
+  name: string;
+  type: "class" | "function" | "variable" | "constant";
+  signature?: string;
+  module: string;
+  line: number;
+};
 
 type APIDiff = {
-  added: APISymbol[]
-  removed: APISymbol[]
-  modified: APISymbol[]
-  unchanged: APISymbol[]
-}
+  added: APISymbol[];
+  removed: APISymbol[];
+  modified: APISymbol[];
+  unchanged: APISymbol[];
+};
 
 type DiffReport = {
-  ok: boolean
-  before_ref: string
-  after_ref: string
-  breaking_changes: boolean
+  ok: boolean;
+  before_ref: string;
+  after_ref: string;
+  breaking_changes: boolean;
   summary: {
-    added_count: number
-    removed_count: number
-    modified_count: number
-    unchanged_count: number
-  }
-  diff: APIDiff
-  report_text: string
-  error?: string
-}
+    added_count: number;
+    removed_count: number;
+    modified_count: number;
+    unchanged_count: number;
+  };
+  diff: APIDiff;
+  report_text: string;
+  error?: string;
+};
 
-async function runCommand(
+function runCommand(
   command: string[],
   timeoutMs: number,
 ): Promise<{ exitCode: number; stdout: string; stderr: string }> {
@@ -40,43 +41,43 @@ async function runCommand(
     const proc = spawn(command[0], command.slice(1), {
       shell: false,
       cwd: process.cwd(),
-    })
+    });
 
-    let stdout = ""
-    let stderr = ""
-    let timedOut = false
+    let stdout = "";
+    let stderr = "";
+    let timedOut = false;
 
     const timer = setTimeout(() => {
-      timedOut = true
-      proc.kill("SIGKILL")
-    }, timeoutMs)
+      timedOut = true;
+      proc.kill("SIGKILL");
+    }, timeoutMs);
 
     proc.stdout.on("data", (chunk) => {
-      stdout += chunk.toString("utf8")
-    })
+      stdout += chunk.toString("utf8");
+    });
 
     proc.stderr.on("data", (chunk) => {
-      stderr += chunk.toString("utf8")
-    })
+      stderr += chunk.toString("utf8");
+    });
 
     proc.on("close", (code) => {
-      clearTimeout(timer)
+      clearTimeout(timer);
       resolve({
         exitCode: timedOut ? -1 : code ?? -1,
         stdout,
         stderr: timedOut ? "Timed out" : stderr,
-      })
-    })
+      });
+    });
 
     proc.on("error", (err) => {
-      clearTimeout(timer)
+      clearTimeout(timer);
       resolve({
         exitCode: -1,
         stdout,
         stderr: err.message,
-      })
-    })
-  })
+      });
+    });
+  });
 }
 
 async function extractAPIFromRef(
@@ -148,60 +149,60 @@ if __name__ == '__main__':
     filepath = sys.argv[1]
     symbols = extract_public_api(filepath)
     print(json.dumps(symbols, indent=2))
-`
+`;
 
   // Save current HEAD
-  const saveResult = await runCommand(["git", "rev-parse", "HEAD"], 5000)
-  const originalRef = saveResult.stdout.trim()
+  const saveResult = await runCommand(["git", "rev-parse", "HEAD"], 5000);
+  const originalRef = saveResult.stdout.trim();
 
   try {
     // Checkout the ref
-    await runCommand(["git", "checkout", ref, "--quiet"], 10_000)
+    await runCommand(["git", "checkout", ref, "--quiet"], 10_000);
 
     // Extract API
     const result = await runCommand(
       ["python3", "-c", pythonScript, filePath],
       timeoutMs,
-    )
+    );
 
     // Go back to original ref
-    await runCommand(["git", "checkout", originalRef, "--quiet"], 10_000)
+    await runCommand(["git", "checkout", originalRef, "--quiet"], 10_000);
 
     if (result.exitCode !== 0) {
-      return []
+      return [];
     }
 
     try {
-      return JSON.parse(result.stdout)
+      return JSON.parse(result.stdout);
     } catch {
-      return []
+      return [];
     }
   } catch {
     // Ensure we go back even on error
-    await runCommand(["git", "checkout", originalRef, "--quiet"], 10_000)
-    return []
+    await runCommand(["git", "checkout", originalRef, "--quiet"], 10_000);
+    return [];
   }
 }
 
 function compareAPIs(before: APISymbol[], after: APISymbol[]): APIDiff {
-  const beforeMap = new Map(before.map((s) => [s.name, s]))
-  const afterMap = new Map(after.map((s) => [s.name, s]))
+  const beforeMap = new Map(before.map((s) => [s.name, s]));
+  const afterMap = new Map(after.map((s) => [s.name, s]));
 
-  const added: APISymbol[] = []
-  const removed: APISymbol[] = []
-  const modified: APISymbol[] = []
-  const unchanged: APISymbol[] = []
+  const added: APISymbol[] = [];
+  const removed: APISymbol[] = [];
+  const modified: APISymbol[] = [];
+  const unchanged: APISymbol[] = [];
 
   // Find added and modified
   for (const [name, symbol] of afterMap) {
     if (!beforeMap.has(name)) {
-      added.push(symbol)
+      added.push(symbol);
     } else {
-      const beforeSymbol = beforeMap.get(name)!
+      const beforeSymbol = beforeMap.get(name)!;
       if (beforeSymbol.signature !== symbol.signature) {
-        modified.push(symbol)
+        modified.push(symbol);
       } else {
-        unchanged.push(symbol)
+        unchanged.push(symbol);
       }
     }
   }
@@ -209,11 +210,11 @@ function compareAPIs(before: APISymbol[], after: APISymbol[]): APIDiff {
   // Find removed
   for (const [name, symbol] of beforeMap) {
     if (!afterMap.has(name)) {
-      removed.push(symbol)
+      removed.push(symbol);
     }
   }
 
-  return { added, removed, modified, unchanged }
+  return { added, removed, modified, unchanged };
 }
 
 function generateDiffReport(
@@ -221,50 +222,50 @@ function generateDiffReport(
   afterRef: string,
   diff: APIDiff,
 ): string {
-  const lines: string[] = []
+  const lines: string[] = [];
 
-  lines.push(`# API Diff Report`)
-  lines.push(``)
-  lines.push(`**Before:** ${beforeRef}`)
-  lines.push(`**After:** ${afterRef}`)
-  lines.push(``)
+  lines.push(`# API Diff Report`);
+  lines.push(``);
+  lines.push(`**Before:** ${beforeRef}`);
+  lines.push(`**After:** ${afterRef}`);
+  lines.push(``);
 
   if (diff.removed.length > 0) {
-    lines.push(`## ❌ Removed (Breaking Changes)`)
-    lines.push(``)
+    lines.push(`## ❌ Removed (Breaking Changes)`);
+    lines.push(``);
     for (const symbol of diff.removed) {
-      lines.push(`- **${symbol.name}** (${symbol.type})`)
-      if (symbol.signature) lines.push(`  \`${symbol.signature}\``)
+      lines.push(`- **${symbol.name}** (${symbol.type})`);
+      if (symbol.signature) lines.push(`  \`${symbol.signature}\``);
     }
-    lines.push(``)
+    lines.push(``);
   }
 
   if (diff.modified.length > 0) {
-    lines.push(`## ⚠️ Modified (Potential Breaking Changes)`)
-    lines.push(``)
+    lines.push(`## ⚠️ Modified (Potential Breaking Changes)`);
+    lines.push(``);
     for (const symbol of diff.modified) {
-      lines.push(`- **${symbol.name}** (${symbol.type})`)
-      if (symbol.signature) lines.push(`  \`${symbol.signature}\``)
+      lines.push(`- **${symbol.name}** (${symbol.type})`);
+      if (symbol.signature) lines.push(`  \`${symbol.signature}\``);
     }
-    lines.push(``)
+    lines.push(``);
   }
 
   if (diff.added.length > 0) {
-    lines.push(`## ✨ Added`)
-    lines.push(``)
+    lines.push(`## ✨ Added`);
+    lines.push(``);
     for (const symbol of diff.added) {
-      lines.push(`- **${symbol.name}** (${symbol.type})`)
-      if (symbol.signature) lines.push(`  \`${symbol.signature}\``)
+      lines.push(`- **${symbol.name}** (${symbol.type})`);
+      if (symbol.signature) lines.push(`  \`${symbol.signature}\``);
     }
-    lines.push(``)
+    lines.push(``);
   }
 
   if (diff.unchanged.length > 0) {
-    lines.push(`## ✅ Unchanged (${diff.unchanged.length} symbols)`)
-    lines.push(``)
+    lines.push(`## ✅ Unchanged (${diff.unchanged.length} symbols)`);
+    lines.push(``);
   }
 
-  return lines.join("\n")
+  return lines.join("\n");
 }
 
 export default tool({
@@ -292,20 +293,21 @@ export default tool({
   },
 
   async execute(args) {
-    const filePath = args.file_path
-    const beforeRef = args.before_ref ?? "HEAD~1"
-    const afterRef = args.after_ref ?? "HEAD"
-    const timeoutMs = args.timeout_ms ?? 30_000
+    const filePath = args.file_path;
+    const beforeRef = args.before_ref ?? "HEAD~1";
+    const afterRef = args.after_ref ?? "HEAD";
+    const timeoutMs = args.timeout_ms ?? 30_000;
 
     try {
-      const beforeAPI = await extractAPIFromRef(beforeRef, filePath, timeoutMs)
-      const afterAPI = await extractAPIFromRef(afterRef, filePath, timeoutMs)
+      const beforeAPI = await extractAPIFromRef(beforeRef, filePath, timeoutMs);
+      const afterAPI = await extractAPIFromRef(afterRef, filePath, timeoutMs);
 
-      const diff = compareAPIs(beforeAPI, afterAPI)
+      const diff = compareAPIs(beforeAPI, afterAPI);
 
-      const breakingChanges = diff.removed.length > 0 || diff.modified.length > 0
+      const breakingChanges = diff.removed.length > 0 ||
+        diff.modified.length > 0;
 
-      const reportText = generateDiffReport(beforeRef, afterRef, diff)
+      const reportText = generateDiffReport(beforeRef, afterRef, diff);
 
       return {
         ok: true,
@@ -320,8 +322,8 @@ export default tool({
         },
         diff,
         report_text: reportText,
-      } as DiffReport
-    } catch (err: any) {
+      } as DiffReport;
+    } catch (err: unknown) {
       return {
         ok: false,
         before_ref: beforeRef,
@@ -335,8 +337,10 @@ export default tool({
         },
         diff: { added: [], removed: [], modified: [], unchanged: [] },
         report_text: "",
-        error: err?.message ?? "Failed to generate API diff",
-      } as DiffReport
+        error: err instanceof Error
+          ? err.message
+          : "Failed to generate API diff",
+      } as DiffReport;
     }
   },
-})
+});

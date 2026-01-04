@@ -1,49 +1,53 @@
-import { tool } from "@opencode-ai/plugin"
-import { spawn } from "node:child_process"
-import { readFile } from "node:fs/promises"
-import path from "node:path"
+import { tool } from "@opencode-ai/plugin";
+import { spawn } from "node:child_process";
+import { readFile } from "node:fs/promises";
+import path from "node:path";
+import process from "node:process";
 
-type Severity = "critical" | "warning" | "info"
+type Severity = "critical" | "warning" | "info";
 
 type FileCoverage = {
-  path: string
-  line_coverage: number
-  branch_coverage: number
-  missing_lines: number[]
-  missing_branches: number[]
-  severity: Severity
-}
+  path: string;
+  line_coverage: number;
+  branch_coverage: number;
+  missing_lines: number[];
+  missing_branches: number[];
+  severity: Severity;
+};
 
 type Summary = {
-  total_statements: number
-  covered_statements: number
-  total_branches: number
-  covered_branches: number
-  line_coverage: number
-  branch_coverage: number
-  file_count: number
-}
+  total_statements: number;
+  covered_statements: number;
+  total_branches: number;
+  covered_branches: number;
+  line_coverage: number;
+  branch_coverage: number;
+  file_count: number;
+};
 
 type CoverageReport = {
-  ok: boolean
-  summary: Summary
-  files: FileCoverage[]
-  passed: boolean
-  threshold: number
-  coverage_file?: string
-  error?: string
+  ok: boolean;
+  summary: Summary;
+  files: FileCoverage[];
+  passed: boolean;
+  threshold: number;
+  coverage_file?: string;
+  error?: string;
+};
+
+const DEFAULT_THRESHOLD = 70.0;
+
+function classifySeverity(
+  lineCoverage: number,
+  branchCoverage: number,
+): Severity {
+  const minCoverage = Math.min(lineCoverage, branchCoverage);
+  if (minCoverage < 50) return "critical";
+  if (minCoverage < 70) return "warning";
+  return "info";
 }
 
-const DEFAULT_THRESHOLD = 70.0
-
-function classifySeverity(lineCoverage: number, branchCoverage: number): Severity {
-  const minCoverage = Math.min(lineCoverage, branchCoverage)
-  if (minCoverage < 50) return "critical"
-  if (minCoverage < 70) return "warning"
-  return "info"
-}
-
-async function runPytest(
+function runPytest(
   pytestArgs: string[],
   timeoutMs: number,
 ): Promise<{ exitCode: number; stdout: string; stderr: string }> {
@@ -51,55 +55,57 @@ async function runPytest(
     const proc = spawn("pytest", pytestArgs, {
       shell: false,
       cwd: process.cwd(),
-    })
+    });
 
-    let stdout = ""
-    let stderr = ""
-    let timedOut = false
+    let stdout = "";
+    let stderr = "";
+    let timedOut = false;
 
     const timer = setTimeout(() => {
-      timedOut = true
-      proc.kill("SIGKILL")
-    }, timeoutMs)
+      timedOut = true;
+      proc.kill("SIGKILL");
+    }, timeoutMs);
 
     proc.stdout.on("data", (chunk) => {
-      stdout += chunk.toString("utf8")
-    })
+      stdout += chunk.toString("utf8");
+    });
 
     proc.stderr.on("data", (chunk) => {
-      stderr += chunk.toString("utf8")
-    })
+      stderr += chunk.toString("utf8");
+    });
 
     proc.on("close", (code) => {
-      clearTimeout(timer)
+      clearTimeout(timer);
       resolve({
         exitCode: timedOut ? -1 : code ?? -1,
         stdout,
         stderr: timedOut ? "Timed out" : stderr,
-      })
-    })
+      });
+    });
 
     proc.on("error", (err) => {
-      clearTimeout(timer)
+      clearTimeout(timer);
       resolve({
         exitCode: -1,
         stdout,
         stderr: err.message,
-      })
-    })
-  })
+      });
+    });
+  });
 }
 
-async function parseCoverageJSON(coverageFile: string): Promise<CoverageReport> {
+async function parseCoverageJSON(
+  coverageFile: string,
+): Promise<CoverageReport> {
   try {
-    const raw = await readFile(coverageFile, "utf8")
-    const data = JSON.parse(raw)
+    const raw = await readFile(coverageFile, "utf8");
+    const data = JSON.parse(raw);
 
     if (!data || !data.totals || !data.files) {
-      throw new Error("Invalid coverage.json structure")
+      throw new Error("Invalid coverage.json structure");
     }
 
-    const totals = data.totals
+    const totals = data.totals;
     const summary: Summary = {
       total_statements: totals.num_statements ?? 0,
       covered_statements: totals.covered_lines ?? 0,
@@ -110,24 +116,29 @@ async function parseCoverageJSON(coverageFile: string): Promise<CoverageReport> 
         ? parseFloat(totals.percent_covered_display)
         : totals.percent_covered ?? 0,
       file_count: Object.keys(data.files).length,
-    }
+    };
 
-    const files: FileCoverage[] = []
-    const projectRoot = process.cwd()
+    const files: FileCoverage[] = [];
+    const projectRoot = process.cwd();
 
-    for (const [filePath, fileData] of Object.entries(data.files) as [string, any][]) {
-      const relPath = path.relative(projectRoot, filePath).replace(/\\/g, "/")
+    for (
+      const [filePath, fileData] of Object.entries(data.files) as [
+        string,
+        Record<string, unknown>,
+      ][]
+    ) {
+      const relPath = path.relative(projectRoot, filePath).replace(/\\/g, "/");
 
-      const lineCov = fileData.summary?.percent_covered ?? 0
+      const lineCov = fileData.summary?.percent_covered ?? 0;
       const branchCov = fileData.summary?.percent_covered_display
         ? parseFloat(fileData.summary.percent_covered_display)
-        : lineCov
+        : lineCov;
 
-      const missingLines: number[] = []
-      const missingBranches: number[] = []
+      const missingLines: number[] = [];
+      const missingBranches: number[] = [];
 
       if (fileData.missing_lines && Array.isArray(fileData.missing_lines)) {
-        missingLines.push(...fileData.missing_lines)
+        missingLines.push(...fileData.missing_lines);
       }
 
       if (fileData.excluded_lines && Array.isArray(fileData.excluded_lines)) {
@@ -141,20 +152,20 @@ async function parseCoverageJSON(coverageFile: string): Promise<CoverageReport> 
         missing_lines: missingLines.sort((a, b) => a - b),
         missing_branches: missingBranches,
         severity: classifySeverity(lineCov, branchCov),
-      })
+      });
     }
 
     // Sort files by severity then coverage
     files.sort((a, b) => {
-      const severityOrder = { critical: 0, warning: 1, info: 2 }
-      const aSev = severityOrder[a.severity]
-      const bSev = severityOrder[b.severity]
-      if (aSev !== bSev) return aSev - bSev
-      return a.line_coverage - b.line_coverage
-    })
+      const severityOrder = { critical: 0, warning: 1, info: 2 };
+      const aSev = severityOrder[a.severity];
+      const bSev = severityOrder[b.severity];
+      if (aSev !== bSev) return aSev - bSev;
+      return a.line_coverage - b.line_coverage;
+    });
 
-    const threshold = DEFAULT_THRESHOLD
-    const passed = summary.branch_coverage >= threshold
+    const threshold = DEFAULT_THRESHOLD;
+    const passed = summary.branch_coverage >= threshold;
 
     return {
       ok: true,
@@ -163,8 +174,8 @@ async function parseCoverageJSON(coverageFile: string): Promise<CoverageReport> 
       passed,
       threshold,
       coverage_file: coverageFile,
-    }
-  } catch (err: any) {
+    };
+  } catch (err: unknown) {
     return {
       ok: false,
       summary: {
@@ -181,7 +192,7 @@ async function parseCoverageJSON(coverageFile: string): Promise<CoverageReport> 
       threshold: DEFAULT_THRESHOLD,
       coverage_file: coverageFile,
       error: err?.message ?? "Failed to parse coverage.json",
-    }
+    };
   }
 }
 
@@ -192,7 +203,9 @@ export default tool({
     run_pytest: tool.schema
       .boolean()
       .optional()
-      .describe("If true, run pytest --cov; if false, parse existing coverage.json"),
+      .describe(
+        "If true, run pytest --cov; if false, parse existing coverage.json",
+      ),
 
     coverage_file: tool.schema
       .string()
@@ -202,12 +215,16 @@ export default tool({
     pytest_args: tool.schema
       .array(tool.schema.string())
       .optional()
-      .describe("Additional pytest arguments (e.g. ['--cov=src', '--cov-report=json'])"),
+      .describe(
+        "Additional pytest arguments (e.g. ['--cov=src', '--cov-report=json'])",
+      ),
 
     timeout_ms: tool.schema
       .number()
       .optional()
-      .describe("Timeout in milliseconds for pytest execution (default: 300000)"),
+      .describe(
+        "Timeout in milliseconds for pytest execution (default: 300000)",
+      ),
 
     threshold: tool.schema
       .number()
@@ -216,19 +233,19 @@ export default tool({
   },
 
   async execute(args) {
-    const runPytestFlag = args.run_pytest ?? true
-    const coverageFile = args.coverage_file ?? "coverage.json"
+    const runPytestFlag = args.run_pytest ?? true;
+    const coverageFile = args.coverage_file ?? "coverage.json";
     const pytestArgs = args.pytest_args ?? [
       "--cov",
       "--cov-report=json",
       "--cov-report=term",
-    ]
-    const timeoutMs = args.timeout_ms ?? 300_000
-    const threshold = args.threshold ?? DEFAULT_THRESHOLD
+    ];
+    const timeoutMs = args.timeout_ms ?? 300_000;
+    const threshold = args.threshold ?? DEFAULT_THRESHOLD;
 
     if (runPytestFlag) {
       // Run pytest with coverage
-      const result = await runPytest(pytestArgs, timeoutMs)
+      const result = await runPytest(pytestArgs, timeoutMs);
 
       if (result.exitCode !== 0 && result.exitCode !== -1) {
         // pytest may fail tests but still generate coverage
@@ -251,19 +268,19 @@ export default tool({
           passed: false,
           threshold,
           error: `pytest command failed: ${result.stderr}`,
-        }
+        };
       }
     }
 
     // Parse coverage.json
-    const report = await parseCoverageJSON(coverageFile)
+    const report = await parseCoverageJSON(coverageFile);
 
     // Update threshold if provided
     if (args.threshold !== undefined) {
-      report.threshold = threshold
-      report.passed = report.summary.branch_coverage >= threshold
+      report.threshold = threshold;
+      report.passed = report.summary.branch_coverage >= threshold;
     }
 
-    return report
+    return report;
   },
-})
+});

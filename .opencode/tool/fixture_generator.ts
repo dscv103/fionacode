@@ -1,40 +1,40 @@
-import { tool } from "@opencode-ai/plugin"
-import { spawn } from "node:child_process"
-import { readFile } from "node:fs/promises"
+import { tool } from "@opencode-ai/plugin";
+import { spawn } from "node:child_process";
+import process from "node:process";
 
 type Parameter = {
-  name: string
-  type?: string
-  default?: string
-  has_default: boolean
-}
+  name: string;
+  type?: string;
+  default?: string;
+  has_default: boolean;
+};
 
 type FunctionSignature = {
-  name: string
-  line: number
-  parameters: Parameter[]
-  return_type?: string
-  docstring?: string
-}
+  name: string;
+  line: number;
+  parameters: Parameter[];
+  return_type?: string;
+  docstring?: string;
+};
 
 type FixtureTemplate = {
-  function_name: string
-  fixture_code: string
-  fixture_name: string
-  scope: "function" | "class" | "module" | "session"
-  description: string
-}
+  function_name: string;
+  fixture_code: string;
+  fixture_name: string;
+  scope: "function" | "class" | "module" | "session";
+  description: string;
+};
 
 type FixtureReport = {
-  ok: boolean
-  file_path: string
-  functions: FunctionSignature[]
-  fixtures: FixtureTemplate[]
-  total_fixtures_generated: number
-  error?: string
-}
+  ok: boolean;
+  file_path: string;
+  functions: FunctionSignature[];
+  fixtures: FixtureTemplate[];
+  total_fixtures_generated: number;
+  error?: string;
+};
 
-async function runCommand(
+function runCommand(
   command: string[],
   timeoutMs: number,
   input?: string,
@@ -43,48 +43,48 @@ async function runCommand(
     const proc = spawn(command[0], command.slice(1), {
       shell: false,
       cwd: process.cwd(),
-    })
+    });
 
-    let stdout = ""
-    let stderr = ""
-    let timedOut = false
+    let stdout = "";
+    let stderr = "";
+    let timedOut = false;
 
     const timer = setTimeout(() => {
-      timedOut = true
-      proc.kill("SIGKILL")
-    }, timeoutMs)
+      timedOut = true;
+      proc.kill("SIGKILL");
+    }, timeoutMs);
 
     proc.stdout.on("data", (chunk) => {
-      stdout += chunk.toString("utf8")
-    })
+      stdout += chunk.toString("utf8");
+    });
 
     proc.stderr.on("data", (chunk) => {
-      stderr += chunk.toString("utf8")
-    })
+      stderr += chunk.toString("utf8");
+    });
 
     proc.on("close", (code) => {
-      clearTimeout(timer)
+      clearTimeout(timer);
       resolve({
         exitCode: timedOut ? -1 : code ?? -1,
         stdout,
         stderr: timedOut ? "Timed out" : stderr,
-      })
-    })
+      });
+    });
 
     proc.on("error", (err) => {
-      clearTimeout(timer)
+      clearTimeout(timer);
       resolve({
         exitCode: -1,
         stdout,
         stderr: err.message,
-      })
-    })
+      });
+    });
 
     if (input) {
-      proc.stdin.write(input)
-      proc.stdin.end()
+      proc.stdin.write(input);
+      proc.stdin.end();
     }
-  })
+  });
 }
 
 async function parseFileSignatures(
@@ -137,72 +137,76 @@ if __name__ == '__main__':
     filepath = sys.argv[1]
     functions = extract_functions(filepath)
     print(json.dumps(functions, indent=2))
-`
+`;
 
   const result = await runCommand(
     ["python3", "-c", pythonScript, filePath],
     timeoutMs,
-  )
+  );
 
   if (result.exitCode !== 0) {
-    return []
+    return [];
   }
 
   try {
-    return JSON.parse(result.stdout)
+    return JSON.parse(result.stdout);
   } catch {
-    return []
+    return [];
   }
 }
 
 function generateFixture(func: FunctionSignature): FixtureTemplate {
-  const fixtureName = `${func.name}_fixture`
-  let fixtureCode = `@pytest.fixture\n`
-  fixtureCode += `def ${fixtureName}():\n`
-  fixtureCode += `    """Auto-generated fixture for ${func.name}.\n`
+  const fixtureName = `${func.name}_fixture`;
+  let fixtureCode = `@pytest.fixture\n`;
+  fixtureCode += `def ${fixtureName}():\n`;
+  fixtureCode += `    """Auto-generated fixture for ${func.name}.\n`;
   if (func.docstring) {
-    fixtureCode += `    \n    Original function: ${func.docstring.split("\n")[0]}\n`
+    fixtureCode += `    \n    Original function: ${
+      func.docstring.split("\n")[0]
+    }\n`;
   }
-  fixtureCode += `    """\n`
+  fixtureCode += `    """\n`;
 
   // Generate mock parameters based on type hints
-  const mocks: string[] = []
+  const mocks: string[] = [];
   for (const param of func.parameters) {
-    if (param.name === "self") continue
+    if (param.name === "self") continue;
 
-    let mockValue = "None"
+    let mockValue = "None";
     if (param.type) {
-      const lowerType = param.type.toLowerCase()
-      if (lowerType.includes("str")) mockValue = `"test_${param.name}"`
-      else if (lowerType.includes("int")) mockValue = "42"
-      else if (lowerType.includes("float")) mockValue = "3.14"
-      else if (lowerType.includes("bool")) mockValue = "True"
-      else if (lowerType.includes("list")) mockValue = "[]"
-      else if (lowerType.includes("dict")) mockValue = "{}"
-      else if (lowerType.includes("set")) mockValue = "set()"
-      else mockValue = `Mock(spec=${param.type})`
+      const lowerType = param.type.toLowerCase();
+      if (lowerType.includes("str")) mockValue = `"test_${param.name}"`;
+      else if (lowerType.includes("int")) mockValue = "42";
+      else if (lowerType.includes("float")) mockValue = "3.14";
+      else if (lowerType.includes("bool")) mockValue = "True";
+      else if (lowerType.includes("list")) mockValue = "[]";
+      else if (lowerType.includes("dict")) mockValue = "{}";
+      else if (lowerType.includes("set")) mockValue = "set()";
+      else mockValue = `Mock(spec=${param.type})`;
     } else if (param.default) {
-      mockValue = param.default
+      mockValue = param.default;
     } else {
-      mockValue = `Mock()`
+      mockValue = `Mock()`;
     }
 
-    mocks.push(`    ${param.name} = ${mockValue}`)
+    mocks.push(`    ${param.name} = ${mockValue}`);
   }
 
   if (mocks.length > 0) {
-    fixtureCode += mocks.join("\n") + "\n"
-    fixtureCode += "    \n"
+    fixtureCode += mocks.join("\n") + "\n";
+    fixtureCode += "    \n";
   }
 
   // Return appropriate structure
   if (func.parameters.length <= 1) {
-    fixtureCode += `    return None  # Modify as needed\n`
+    fixtureCode += `    return None  # Modify as needed\n`;
   } else {
     const paramNames = func.parameters
       .filter((p) => p.name !== "self")
-      .map((p) => p.name)
-    fixtureCode += `    return {${paramNames.map((n) => `'${n}': ${n}`).join(", ")}}\n`
+      .map((p) => p.name);
+    fixtureCode += `    return {${
+      paramNames.map((n) => `'${n}': ${n}`).join(", ")
+    }}\n`;
   }
 
   return {
@@ -210,8 +214,9 @@ function generateFixture(func: FunctionSignature): FixtureTemplate {
     fixture_code: fixtureCode,
     fixture_name: fixtureName,
     scope: "function",
-    description: `Auto-generated fixture for ${func.name} with ${func.parameters.length} parameters`,
-  }
+    description:
+      `Auto-generated fixture for ${func.name} with ${func.parameters.length} parameters`,
+  };
 }
 
 export default tool({
@@ -225,7 +230,9 @@ export default tool({
     function_names: tool.schema
       .array(tool.schema.string())
       .optional()
-      .describe("Specific function names to generate fixtures for (default: all)"),
+      .describe(
+        "Specific function names to generate fixtures for (default: all)",
+      ),
 
     include_mock_imports: tool.schema
       .boolean()
@@ -239,13 +246,13 @@ export default tool({
   },
 
   async execute(args) {
-    const filePath = args.file_path
-    const functionNames = args.function_names
-    const includeMockImports = args.include_mock_imports ?? true
-    const timeoutMs = args.timeout_ms ?? 30_000
+    const filePath = args.file_path;
+    const functionNames = args.function_names;
+    const _includeMockImports = args.include_mock_imports ?? true;
+    const timeoutMs = args.timeout_ms ?? 30_000;
 
     try {
-      const functions = await parseFileSignatures(filePath, timeoutMs)
+      const functions = await parseFileSignatures(filePath, timeoutMs);
 
       if (functions.length === 0) {
         return {
@@ -255,15 +262,15 @@ export default tool({
           fixtures: [],
           total_fixtures_generated: 0,
           error: "No functions found in file",
-        } as FixtureReport
+        } as FixtureReport;
       }
 
       // Filter by function names if provided
       const filteredFunctions = functionNames
         ? functions.filter((f) => functionNames.includes(f.name))
-        : functions
+        : functions;
 
-      const fixtures = filteredFunctions.map((func) => generateFixture(func))
+      const fixtures = filteredFunctions.map((func) => generateFixture(func));
 
       return {
         ok: true,
@@ -271,8 +278,8 @@ export default tool({
         functions: filteredFunctions,
         fixtures,
         total_fixtures_generated: fixtures.length,
-      } as FixtureReport
-    } catch (err: any) {
+      } as FixtureReport;
+    } catch (err: unknown) {
       return {
         ok: false,
         file_path: filePath,
@@ -280,7 +287,7 @@ export default tool({
         fixtures: [],
         total_fixtures_generated: 0,
         error: err?.message ?? "Failed to generate fixtures",
-      } as FixtureReport
+      } as FixtureReport;
     }
   },
-})
+});

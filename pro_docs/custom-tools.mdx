@@ -179,6 +179,7 @@ This project includes four essential custom tools for multi-agent workflow orche
 **Agents**: Implementer, Code Review, Diagnostics, Executor
 
 **Inputs**:
+
 - `run_pytest` (boolean, optional): If true, runs pytest with coverage; if false, parses existing coverage.json (default: true)
 - `coverage_file` (string, optional): Path to coverage.json (default: "coverage.json")
 - `pytest_args` (array, optional): Additional pytest arguments (default: ["--cov", "--cov-report=json"])
@@ -186,6 +187,7 @@ This project includes four essential custom tools for multi-agent workflow orche
 - `threshold` (number, optional): Branch coverage threshold percentage (default: 70.0)
 
 **Outputs**:
+
 - `ok` (boolean): Whether the operation succeeded
 - `summary`: Total/covered statements and branches, line/branch coverage percentages, file count
 - `files`: Array of file-level coverage with paths, percentages, missing lines/branches, and severity classification
@@ -194,6 +196,7 @@ This project includes four essential custom tools for multi-agent workflow orche
 - `error` (string, optional): Error message if parsing failed
 
 **Example**:
+
 ```ts
 // Run pytest and analyze coverage
 const result = await coverage_analyzer({
@@ -217,6 +220,7 @@ const result = await coverage_analyzer({
 **Agents**: Orchestrator, Code Review
 
 **Inputs**:
+
 - `tests_passed` (boolean, optional): Whether the test suite passed
 - `branch_coverage` (number, optional): Branch coverage percentage
 - `type_checks_passed` (boolean, optional): Whether type checks passed (mypy/pyright/tsc)
@@ -224,6 +228,7 @@ const result = await coverage_analyzer({
 - `notes` (string, optional): Optional context from the agent
 
 **Outputs**:
+
 - `ok` (boolean): Whether the operation succeeded
 - `decision` (string): "approve" or "iterate"
 - `score` (number): Percentage score 0-100 based on met criteria
@@ -234,6 +239,7 @@ const result = await coverage_analyzer({
 - `summary` (string): Human-readable summary
 
 **Example**:
+
 ```ts
 const result = await exit_criteria_checker({
   tests_passed: true,
@@ -253,10 +259,12 @@ const result = await exit_criteria_checker({
 **Agents**: Implementer, Code Review, Diagnostics
 
 **Inputs**:
+
 - `profile` (enum: "pyright" | "ty" | "both"): Which type checker profile to run
 - `timeout_ms` (number, optional): Timeout per command in milliseconds (default: 180000)
 
 **Outputs**:
+
 - `ok` (boolean): Always true (operation completed)
 - `profile` (string): The profile that was run
 - `passed` (boolean): Whether all checks passed with no errors
@@ -266,6 +274,7 @@ const result = await exit_criteria_checker({
 - `runs`: Array of command run results with stdout/stderr/exitCode
 
 **Example**:
+
 ```ts
 const result = await type_check_aggregator({
   profile: "both",
@@ -286,6 +295,7 @@ const result = await type_check_aggregator({
 **Agents**: Orchestrator, Planning
 
 **Inputs**:
+
 - `action` (enum): "init" | "create_task" | "update_task" | "set_status" | "link_dep" | "add_blocker" | "clear_blocker" | "attach_artifact" | "get_snapshot"
 - `force` (boolean, optional): If true, overwrite state on init
 - `task_id` (string, optional): Task UUID (required for most actions)
@@ -299,6 +309,7 @@ const result = await type_check_aggregator({
 - `artifact_note` (string, optional): Optional artifact note
 
 **Outputs**:
+
 - `ok` (boolean): Whether the operation succeeded
 - `message` (string, optional): Status message
 - `task_id` (string, optional): Task UUID
@@ -306,6 +317,7 @@ const result = await type_check_aggregator({
 - `state` (object, optional): Full state snapshot (for get_snapshot action)
 
 **Example**:
+
 ```ts
 // Initialize tracker
 await task_tracker({ action: "init" })
@@ -346,12 +358,14 @@ Three high-value tools for testing efficiency, security, and release management.
 **Agents**: Executor, Implementer, Diagnostics
 
 **Inputs**:
+
 - `mode` (enum, optional): "auto" (default, detects changes), "all" (run all tests), "affected" (only changed), "specific" (provided files)
 - `test_files` (array, optional): Specific test files to run (for mode='specific')
 - `pytest_args` (array, optional): Additional pytest arguments (e.g., ['-k', 'test_foo', '--maxfail=1'])
 - `timeout_ms` (number, optional): Timeout in milliseconds (default: 300000)
 
 **Outputs**:
+
 - `ok` (boolean): Whether the operation succeeded
 - `mode` (string): The mode that was executed
 - `changed_files` (array): List of changed Python files from git diff
@@ -367,6 +381,7 @@ Three high-value tools for testing efficiency, security, and release management.
 - `error` (string, optional): Error message if operation failed
 
 **Example**:
+
 ```ts
 // Auto-detect changed files and run affected tests
 const result = await test_runner_smart({ mode: "auto" })
@@ -393,12 +408,14 @@ const result = await test_runner_smart({
 **Agents**: Security Review, Compliance, Integration
 
 **Inputs**:
+
 - `check_vulnerabilities` (boolean, optional): Check for security vulnerabilities (default: true)
 - `check_licenses` (boolean, optional): Check for license issues (default: true)
 - `check_outdated` (boolean, optional): Check for outdated packages (default: true)
 - `timeout_ms` (number, optional): Timeout per check in milliseconds (default: 60000)
 
 **Outputs**:
+
 - `ok` (boolean): Whether the operation succeeded
 - `vulnerabilities` (array): List of vulnerabilities with package, version, vulnerability_id, severity, description, fixed_in
 - `license_issues` (array): List of license issues with package, version, license, issue_type, description
@@ -411,6 +428,7 @@ const result = await test_runner_smart({
 - `error` (string, optional): Error message if operation failed
 
 **Example**:
+
 ```ts
 // Full audit
 const result = await dependency_auditor({})
@@ -435,12 +453,14 @@ const result = await dependency_auditor({
 **Agents**: Communication, Integration
 
 **Inputs**:
+
 - `from_ref` (string, optional): Starting git reference (tag, commit, branch). Default: latest tag or HEAD~10
 - `to_ref` (string, optional): Ending git reference (default: HEAD)
 - `version` (string, optional): Version string for the changelog header (e.g., '1.2.0')
 - `timeout_ms` (number, optional): Timeout in milliseconds (default: 30000)
 
 **Outputs**:
+
 - `ok` (boolean): Whether the operation succeeded
 - `version` (string, optional): Version string used in header
 - `date` (string): ISO date string for the changelog
@@ -451,6 +471,7 @@ const result = await dependency_auditor({
 - `error` (string, optional): Error message if operation failed
 
 **Example**:
+
 ```ts
 // Generate changelog from latest tag to HEAD
 const result = await changelog_generator({
@@ -471,4 +492,356 @@ const result = await changelog_generator({
 ---
 
 **Note**: Phase 2 tools build on Phase 1 capabilities to provide testing efficiency (delta testing), security auditing (vulnerability/license scanning), and release automation (conventional changelog generation). All tools follow the thin-wrapper pattern with structured JSON outputs.
+
+---
+
+## Phase 3 Tools: Quality of Life
+
+Phase 3 tools provide enhanced code quality analysis, test automation, documentation validation, and workflow enforcement to streamline development and ensure consistency.
+
+---
+
+### code_complexity_scorer
+
+**Purpose**: Calculate cyclomatic complexity and maintainability index for Python files using radon. Identifies functions that need refactoring and ranks them by complexity.
+
+**Agents**: Refactoring, Code Review
+
+**Inputs**:
+
+- `file_path` (string): Path to Python file to analyze
+- `complexity_threshold` (number, optional): Minimum complexity to report (default: 10)
+- `timeout_ms` (number, optional): Timeout in milliseconds (default: 10000)
+
+**Outputs**:
+
+- `ok` (boolean): Whether the operation succeeded
+- `file_path` (string): Path to analyzed file
+- `overall_grade` (string): Overall maintainability grade (A-F)
+- `overall_mi` (number): Overall maintainability index (0-100)
+- `file_complexity` (array): Per-file complexity analysis with filename, functions, average_complexity, max_complexity, maintainability_index, grade
+- `functions` (array): Per-function analysis with name, complexity, rank (A-F), line_number
+- `needs_refactoring` (array): Functions exceeding complexity threshold
+- `total_functions` (number): Total functions analyzed
+- `average_complexity` (number): Average cyclomatic complexity
+- `error` (string, optional): Error message if operation failed
+
+**Example**:
+
+```ts
+// Analyze a single file
+const result = await code_complexity_scorer({
+  file_path: "src/services/processor.py",
+  complexity_threshold: 15
+})
+
+// result.needs_refactoring lists complex functions to refactor
+// result.overall_mi indicates maintainability (higher is better)
+```
+
+---
+
+### fixture_generator
+
+**Purpose**: Auto-generate pytest fixtures from function signatures using Python AST parsing. Creates type-aware mock fixtures for testing.
+
+**Agents**: Implementer
+
+**Inputs**:
+
+- `file_path` (string): Path to Python module to analyze
+- `output_path` (string, optional): Where to write fixture file (default: tests/fixtures/conftest.py)
+- `include_classes` (boolean, optional): Include class instantiation fixtures (default: true)
+- `timeout_ms` (number, optional): Timeout in milliseconds (default: 15000)
+
+**Outputs**:
+
+- `ok` (boolean): Whether the operation succeeded
+- `file_path` (string): Source file analyzed
+- `output_path` (string): Path where fixtures were written
+- `fixtures_generated` (array): List of generated fixtures with name, signature, fixture_code
+- `total_fixtures` (number): Total fixtures generated
+- `error` (string, optional): Error message if operation failed
+
+**Example**:
+
+```ts
+// Generate fixtures for a module
+const result = await fixture_generator({
+  file_path: "src/services/auth.py",
+  output_path: "tests/fixtures/auth_fixtures.py"
+})
+
+// result.fixtures_generated contains pytest fixture code
+// Fixtures use unittest.mock.Mock with type-aware defaults
+```
+
+---
+
+### flakiness_detector
+
+**Purpose**: Run pytest tests multiple times to detect non-deterministic failures. Identifies flaky tests caused by race conditions, timing issues, or improper test isolation.
+
+**Agents**: Executor, Diagnostics
+
+**Inputs**:
+
+- `test_path` (string, optional): Specific test file or directory (default: tests/)
+- `iterations` (number, optional): Number of times to run tests (default: 5)
+- `fail_threshold` (number, optional): Pass rate % below which test is marked flaky (default: 80.0)
+- `timeout_ms` (number, optional): Timeout per iteration in milliseconds (default: 60000)
+
+**Outputs**:
+
+- `ok` (boolean): Whether the operation succeeded
+- `iterations` (number): Total iterations run
+- `results` (array): Per-test results with test_name, passed, failed, pass_rate, is_flaky
+- `flaky_tests` (array): Tests identified as flaky
+- `total_tests` (number): Total unique tests found
+- `total_flaky` (number): Total flaky tests detected
+- `overall_pass_rate` (number): Average pass rate across all tests
+- `error` (string, optional): Error message if operation failed
+
+**Example**:
+
+```ts
+// Detect flaky tests in entire suite
+const result = await flakiness_detector({
+  iterations: 10,
+  fail_threshold: 90.0
+})
+
+// Run specific test file multiple times
+const result = await flakiness_detector({
+  test_path: "tests/test_api.py",
+  iterations: 20
+})
+
+// result.flaky_tests lists non-deterministic tests
+```
+
+---
+
+### docstring_validator
+
+**Purpose**: Verify Python docstrings match function signatures. Checks for missing, incomplete, or mismatched parameter documentation in Google, Sphinx, and NumPy docstring formats.
+
+**Agents**: Docs, Code Review
+
+**Inputs**:
+
+- `file_path` (string): Path to Python file to validate
+- `style` (string, optional): Docstring style to validate ('google', 'sphinx', 'numpy', 'auto'). Default: 'auto'
+- `require_all` (boolean, optional): Require docstrings on all functions (default: false, only public functions)
+- `timeout_ms` (number, optional): Timeout in milliseconds (default: 10000)
+
+**Outputs**:
+
+- `ok` (boolean): Whether the operation succeeded
+- `file_path` (string): File analyzed
+- `style` (string): Docstring style detected/used
+- `total_functions` (number): Total functions analyzed
+- `documented_functions` (number): Functions with docstrings
+- `issues` (array): Validation issues with function, line, issue_type, severity, description, suggestion
+- `total_issues` (number): Total issues found
+- `passed` (boolean): True if no errors found
+- `error` (string, optional): Error message if operation failed
+
+**Example**:
+
+```ts
+// Validate all docstrings in a file
+const result = await docstring_validator({
+  file_path: "src/api/endpoints.py",
+  style: "google"
+})
+
+// Require docstrings on all functions (including private)
+const result = await docstring_validator({
+  file_path: "src/core/utils.py",
+  require_all: true
+})
+
+// result.issues lists missing/incomplete documentation
+```
+
+---
+
+### api_diff_reporter
+
+**Purpose**: Compare public API surface (classes, functions, variables) before and after changes to detect breaking changes. Uses Python AST to extract exported symbols and compare signatures.
+
+**Agents**: Code Review, Communication
+
+**Inputs**:
+
+- `file_path` (string): Python module file to analyze for API changes
+- `before_ref` (string, optional): Git reference for 'before' state (default: HEAD~1)
+- `after_ref` (string, optional): Git reference for 'after' state (default: HEAD)
+- `timeout_ms` (number, optional): Timeout in milliseconds (default: 30000)
+
+**Outputs**:
+
+- `ok` (boolean): Whether the operation succeeded
+- `before_ref` (string): Git reference for before state
+- `after_ref` (string): Git reference for after state
+- `breaking_changes` (boolean): True if removed or modified symbols detected
+- `summary` (object): Counts with added_count, removed_count, modified_count, unchanged_count
+- `diff` (object): API changes with added, removed, modified, unchanged arrays of symbols
+- `report_text` (string): Formatted markdown diff report
+- `error` (string, optional): Error message if operation failed
+
+**Example**:
+
+```ts
+// Compare API between HEAD and previous commit
+const result = await api_diff_reporter({
+  file_path: "src/api/public.py"
+})
+
+// Compare specific git references
+const result = await api_diff_reporter({
+  file_path: "src/core/interface.py",
+  before_ref: "v1.0.0",
+  after_ref: "main"
+})
+
+// result.breaking_changes indicates if version bump needed
+// result.report_text contains markdown changelog
+```
+
+---
+
+### smart_commit_builder
+
+**Purpose**: Analyze staged files and suggest conventional commit messages with type and scope. Uses heuristics to determine commit type (feat, fix, docs, etc.) based on file changes.
+
+**Agents**: Communication, Integration
+
+**Inputs**:
+
+- `custom_subject` (string, optional): Optional custom subject line to override auto-generated
+- `custom_scope` (string, optional): Optional scope to include (e.g., 'api', 'auth', 'ui')
+- `timeout_ms` (number, optional): Timeout in milliseconds (default: 10000)
+
+**Outputs**:
+
+- `ok` (boolean): Whether the operation succeeded
+- `staged_files` (array): List of files staged for commit
+- `suggestions` (array): Commit suggestions with type, scope, subject, body, breaking, confidence, reasoning
+- `recommended_commit` (string): Top-ranked conventional commit message
+- `error` (string, optional): Error message if no files staged or operation failed
+
+**Example**:
+
+```ts
+// Generate commit message from staged files
+const result = await smart_commit_builder({})
+
+// Override with custom subject and scope
+const result = await smart_commit_builder({
+  custom_subject: "add user authentication",
+  custom_scope: "auth"
+})
+
+// result.recommended_commit is the formatted conventional commit
+// result.suggestions lists alternatives with confidence scores
+```
+
+---
+
+### branch_strategy_enforcer
+
+**Purpose**: Validate branch naming conventions, check if branch is up-to-date with base branch, and detect potential merge conflicts. Enforces team workflow conventions.
+
+**Agents**: Integration, Orchestrator
+
+**Inputs**:
+
+- `base_branch` (string, optional): Base branch to compare against (default: 'main')
+- `naming_pattern` (string, optional): Regex pattern for branch naming (default: type/name format)
+- `max_commits_behind` (number, optional): Max commits behind before error (default: 10)
+- `timeout_ms` (number, optional): Timeout in milliseconds (default: 15000)
+
+**Outputs**:
+
+- `ok` (boolean): Whether the operation succeeded
+- `current_branch` (string): Current branch name
+- `base_branch` (string): Base branch compared against
+- `is_valid` (boolean): Overall validation passed
+- `naming_valid` (boolean): Branch name follows convention
+- `up_to_date` (boolean): Branch is not behind base
+- `has_conflicts` (boolean): Potential merge conflicts detected
+- `commits_ahead` (number): Commits ahead of base
+- `commits_behind` (number): Commits behind base
+- `issues` (array): Validation issues with type, severity, description, fix_suggestion
+- `passed` (boolean): No error-level issues
+- `error` (string, optional): Error message if operation failed
+
+**Example**:
+
+```ts
+// Validate current branch against main
+const result = await branch_strategy_enforcer({
+  base_branch: "main"
+})
+
+// Custom naming pattern and staleness threshold
+const result = await branch_strategy_enforcer({
+  base_branch: "develop",
+  naming_pattern: "^(feature|bugfix|hotfix)/[A-Z]+-[0-9]+",
+  max_commits_behind: 5
+})
+
+// result.passed indicates if branch ready for PR
+// result.issues contains actionable recommendations
+```
+
+---
+
+### agent_handoff_validator
+
+**Purpose**: Validate agent handoff responses contain required sections (status/artifacts/next-action). Enforces the handoff contract defined in agent prompts.
+
+**Agents**: Orchestrator
+
+**Inputs**:
+
+- `response_text` (string): The agent's handoff response text to validate
+- `require_optional` (boolean, optional): Require optional sections like notes and blockers (default: false)
+- `strict_mode` (boolean, optional): Treat warnings as errors (default: false)
+
+**Outputs**:
+
+- `ok` (boolean): Whether the operation succeeded
+- `valid` (boolean): Response passed validation
+- `sections_found` (array): List of sections present in response
+- `sections_missing` (array): List of required sections missing
+- `issues` (array): Validation issues with section, type, severity, description
+- `response_text` (string): Original response text
+- `error` (string, optional): Error message if operation failed
+
+**Example**:
+
+```ts
+// Validate agent handoff response
+const result = await agent_handoff_validator({
+  response_text: agentResponse
+})
+
+// Strict validation (warnings as errors)
+const result = await agent_handoff_validator({
+  response_text: agentResponse,
+  require_optional: true,
+  strict_mode: true
+})
+
+// result.valid indicates if handoff contract met
+// result.issues lists missing/invalid sections
+```
+
+---
+
+**Note**: Phase 3 tools focus on quality of life improvements for development workflows. They provide code quality scoring (refactoring identification), test automation (fixture generation), reliability testing (flakiness detection), documentation validation, API change detection, commit message assistance, branch hygiene enforcement, and agent coordination validation. All tools maintain the thin-wrapper pattern with comprehensive structured outputs.
+
 ````

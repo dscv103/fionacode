@@ -341,7 +341,13 @@
     },
     "sqlite": {
       "type": "local",
-      "command": ["npx", "-y", "@modelcontextprotocol/server-sqlite", "--db-path", ".opencode/state/metadata.db"],
+      "command": [
+        "npx",
+        "-y",
+        "@modelcontextprotocol/server-sqlite",
+        "--db-path",
+        ".opencode/state/metadata.db"
+      ],
       "enabled": true,
       "timeout": 5000
     }

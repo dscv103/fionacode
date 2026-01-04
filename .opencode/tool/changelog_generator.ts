@@ -1,35 +1,48 @@
-import { tool } from "@opencode-ai/plugin"
-import { spawn } from "node:child_process"
+import { tool } from "@opencode-ai/plugin";
+import { spawn } from "node:child_process";
+import process from "node:process";
 
 type ConventionalCommit = {
-  hash: string
-  type: "feat" | "fix" | "docs" | "style" | "refactor" | "perf" | "test" | "build" | "ci" | "chore" | "revert" | "other"
-  scope?: string
-  breaking: boolean
-  subject: string
-  body?: string
-  footer?: string
-  author: string
-  date: string
-}
+  hash: string;
+  type:
+    | "feat"
+    | "fix"
+    | "docs"
+    | "style"
+    | "refactor"
+    | "perf"
+    | "test"
+    | "build"
+    | "ci"
+    | "chore"
+    | "revert"
+    | "other";
+  scope?: string;
+  breaking: boolean;
+  subject: string;
+  body?: string;
+  footer?: string;
+  author: string;
+  date: string;
+};
 
 type ChangelogSection = {
-  title: string
-  commits: ConventionalCommit[]
-}
+  title: string;
+  commits: ConventionalCommit[];
+};
 
 type ChangelogReport = {
-  ok: boolean
-  version?: string
-  date: string
-  sections: ChangelogSection[]
-  breaking_changes: ConventionalCommit[]
-  total_commits: number
-  markdown: string
-  error?: string
-}
+  ok: boolean;
+  version?: string;
+  date: string;
+  sections: ChangelogSection[];
+  breaking_changes: ConventionalCommit[];
+  total_commits: number;
+  markdown: string;
+  error?: string;
+};
 
-async function runCommand(
+function runCommand(
   command: string[],
   timeoutMs: number,
 ): Promise<{ exitCode: number; stdout: string; stderr: string }> {
@@ -37,56 +50,56 @@ async function runCommand(
     const proc = spawn(command[0], command.slice(1), {
       shell: false,
       cwd: process.cwd(),
-    })
+    });
 
-    let stdout = ""
-    let stderr = ""
-    let timedOut = false
+    let stdout = "";
+    let stderr = "";
+    let timedOut = false;
 
     const timer = setTimeout(() => {
-      timedOut = true
-      proc.kill("SIGKILL")
-    }, timeoutMs)
+      timedOut = true;
+      proc.kill("SIGKILL");
+    }, timeoutMs);
 
     proc.stdout.on("data", (chunk) => {
-      stdout += chunk.toString("utf8")
-    })
+      stdout += chunk.toString("utf8");
+    });
 
     proc.stderr.on("data", (chunk) => {
-      stderr += chunk.toString("utf8")
-    })
+      stderr += chunk.toString("utf8");
+    });
 
     proc.on("close", (code) => {
-      clearTimeout(timer)
+      clearTimeout(timer);
       resolve({
         exitCode: timedOut ? -1 : code ?? -1,
         stdout,
         stderr: timedOut ? "Timed out" : stderr,
-      })
-    })
+      });
+    });
 
     proc.on("error", (err) => {
-      clearTimeout(timer)
+      clearTimeout(timer);
       resolve({
         exitCode: -1,
         stdout,
         stderr: err.message,
-      })
-    })
-  })
+      });
+    });
+  });
 }
 
 function parseConventionalCommit(line: string): ConventionalCommit | null {
   // Format: hash|author|date|message
-  const parts = line.split("|")
-  if (parts.length < 4) return null
+  const parts = line.split("|");
+  if (parts.length < 4) return null;
 
-  const [hash, author, date, ...messageParts] = parts
-  const message = messageParts.join("|")
+  const [hash, author, date, ...messageParts] = parts;
+  const message = messageParts.join("|");
 
   // Parse conventional commit format: type(scope)!: subject
-  const conventionalRegex = /^(\w+)(?:\(([^)]+)\))?(!)?: (.+)$/
-  const match = message.match(conventionalRegex)
+  const conventionalRegex = /^(\w+)(?:\(([^)]+)\))?(!)?: (.+)$/;
+  const match = message.match(conventionalRegex);
 
   if (!match) {
     return {
@@ -96,22 +109,37 @@ function parseConventionalCommit(line: string): ConventionalCommit | null {
       subject: message,
       author,
       date,
-    }
+    };
   }
 
-  const [, type, scope, breakingMarker, subject] = match
-  const validTypes = ["feat", "fix", "docs", "style", "refactor", "perf", "test", "build", "ci", "chore", "revert"]
-  const commitType = validTypes.includes(type) ? (type as ConventionalCommit["type"]) : "other"
+  const [, type, scope, breakingMarker, subject] = match;
+  const validTypes = [
+    "feat",
+    "fix",
+    "docs",
+    "style",
+    "refactor",
+    "perf",
+    "test",
+    "build",
+    "ci",
+    "chore",
+    "revert",
+  ];
+  const commitType = validTypes.includes(type)
+    ? (type as ConventionalCommit["type"])
+    : "other";
 
   return {
     hash,
     type: commitType,
     scope: scope || undefined,
-    breaking: !!breakingMarker || message.toLowerCase().includes("breaking change"),
+    breaking: !!breakingMarker ||
+      message.toLowerCase().includes("breaking change"),
     subject,
     author,
     date,
-  }
+  };
 }
 
 async function getCommitsSinceTag(
@@ -119,76 +147,76 @@ async function getCommitsSinceTag(
   toRef: string,
   timeoutMs: number,
 ): Promise<ConventionalCommit[]> {
-  const format = "%H|%an|%ad|%s"
+  const format = "%H|%an|%ad|%s";
   const args = [
     "log",
     `${fromRef}..${toRef}`,
     `--format=${format}`,
     "--date=short",
     "--no-merges",
-  ]
+  ];
 
-  const result = await runCommand(["git", ...args], timeoutMs)
+  const result = await runCommand(["git", ...args], timeoutMs);
 
   if (result.exitCode !== 0) {
-    return []
+    return [];
   }
 
-  const commits: ConventionalCommit[] = []
-  const lines = result.stdout.split("\n").filter((l) => l.trim())
+  const commits: ConventionalCommit[] = [];
+  const lines = result.stdout.split("\n").filter((l) => l.trim());
 
   for (const line of lines) {
-    const commit = parseConventionalCommit(line)
+    const commit = parseConventionalCommit(line);
     if (commit) {
-      commits.push(commit)
+      commits.push(commit);
     }
   }
 
-  return commits
+  return commits;
 }
 
 function generateMarkdown(report: ChangelogReport): string {
-  const lines: string[] = []
+  const lines: string[] = [];
 
-  lines.push(`# Changelog`)
-  lines.push("")
+  lines.push(`# Changelog`);
+  lines.push("");
 
   if (report.version) {
-    lines.push(`## [${report.version}] - ${report.date}`)
+    lines.push(`## [${report.version}] - ${report.date}`);
   } else {
-    lines.push(`## Unreleased - ${report.date}`)
+    lines.push(`## Unreleased - ${report.date}`);
   }
-  lines.push("")
+  lines.push("");
 
   if (report.breaking_changes.length > 0) {
-    lines.push("### ⚠️ BREAKING CHANGES")
-    lines.push("")
+    lines.push("### ⚠️ BREAKING CHANGES");
+    lines.push("");
     for (const commit of report.breaking_changes) {
-      const scope = commit.scope ? `**${commit.scope}:** ` : ""
-      lines.push(`- ${scope}${commit.subject} ([${commit.hash.slice(0, 7)}])`)
+      const scope = commit.scope ? `**${commit.scope}:** ` : "";
+      lines.push(`- ${scope}${commit.subject} ([${commit.hash.slice(0, 7)}])`);
     }
-    lines.push("")
+    lines.push("");
   }
 
   for (const section of report.sections) {
-    if (section.commits.length === 0) continue
+    if (section.commits.length === 0) continue;
 
-    lines.push(`### ${section.title}`)
-    lines.push("")
+    lines.push(`### ${section.title}`);
+    lines.push("");
 
     for (const commit of section.commits) {
-      const scope = commit.scope ? `**${commit.scope}:** ` : ""
-      lines.push(`- ${scope}${commit.subject} ([${commit.hash.slice(0, 7)}])`)
+      const scope = commit.scope ? `**${commit.scope}:** ` : "";
+      lines.push(`- ${scope}${commit.subject} ([${commit.hash.slice(0, 7)}])`);
     }
-    lines.push("")
+    lines.push("");
   }
 
   if (report.total_commits === 0) {
-    lines.push("_No changes in this release._")
-    lines.push("")
+    lines.push("_No changes in this release._");
+    lines.push("");
   }
 
-  return lines.join("\n")
+  return lines.join("\n");
 }
 
 export default tool({
@@ -198,7 +226,9 @@ export default tool({
     from_ref: tool.schema
       .string()
       .optional()
-      .describe("Starting git reference (tag, commit, branch). Default: latest tag or HEAD~10"),
+      .describe(
+        "Starting git reference (tag, commit, branch). Default: latest tag or HEAD~10",
+      ),
 
     to_ref: tool.schema
       .string()
@@ -217,22 +247,22 @@ export default tool({
   },
 
   async execute(args) {
-    const toRef = args.to_ref ?? "HEAD"
-    const timeoutMs = args.timeout_ms ?? 30_000
-    const version = args.version
+    const toRef = args.to_ref ?? "HEAD";
+    const timeoutMs = args.timeout_ms ?? 30_000;
+    const version = args.version;
 
     // Determine from_ref
-    let fromRef = args.from_ref
+    let fromRef = args.from_ref;
     if (!fromRef) {
       // Try to get the latest tag
       const tagResult = await runCommand(
         ["git", "describe", "--tags", "--abbrev=0"],
         5000,
-      )
-      fromRef = tagResult.exitCode === 0 ? tagResult.stdout.trim() : "HEAD~10"
+      );
+      fromRef = tagResult.exitCode === 0 ? tagResult.stdout.trim() : "HEAD~10";
     }
 
-    const commits = await getCommitsSinceTag(fromRef, toRef, timeoutMs)
+    const commits = await getCommitsSinceTag(fromRef, toRef, timeoutMs);
 
     if (commits.length === 0) {
       return {
@@ -251,12 +281,12 @@ export default tool({
           total_commits: 0,
           markdown: "",
         }),
-      } as ChangelogReport
+      } as ChangelogReport;
     }
 
-    const breakingChanges = commits.filter((c) => c.breaking)
+    const breakingChanges = commits.filter((c) => c.breaking);
 
-    const sectionMap = new Map<string, ConventionalCommit[]>()
+    const sectionMap = new Map<string, ConventionalCommit[]>();
     const sectionTitles: Record<string, string> = {
       feat: "✨ Features",
       fix: "🐛 Bug Fixes",
@@ -270,16 +300,16 @@ export default tool({
       chore: "🔧 Chores",
       revert: "⏪ Reverts",
       other: "📦 Other Changes",
-    }
+    };
 
     for (const commit of commits) {
       if (!sectionMap.has(commit.type)) {
-        sectionMap.set(commit.type, [])
+        sectionMap.set(commit.type, []);
       }
-      sectionMap.get(commit.type)!.push(commit)
+      sectionMap.get(commit.type)!.push(commit);
     }
 
-    const sections: ChangelogSection[] = []
+    const sections: ChangelogSection[] = [];
     const orderedTypes: ConventionalCommit["type"][] = [
       "feat",
       "fix",
@@ -293,15 +323,15 @@ export default tool({
       "chore",
       "revert",
       "other",
-    ]
+    ];
 
     for (const type of orderedTypes) {
-      const commits = sectionMap.get(type)
+      const commits = sectionMap.get(type);
       if (commits && commits.length > 0) {
         sections.push({
           title: sectionTitles[type] || "Other",
           commits,
-        })
+        });
       }
     }
 
@@ -313,10 +343,10 @@ export default tool({
       breaking_changes: breakingChanges,
       total_commits: commits.length,
       markdown: "",
-    }
+    };
 
-    report.markdown = generateMarkdown(report)
+    report.markdown = generateMarkdown(report);
 
-    return report
+    return report;
   },
-})
+});

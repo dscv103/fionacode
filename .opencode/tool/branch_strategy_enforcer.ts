@@ -1,29 +1,30 @@
-import { tool } from "@opencode-ai/plugin"
-import { spawn } from "node:child_process"
+import { tool } from "@opencode-ai/plugin";
+import { spawn } from "node:child_process";
+import process from "node:process";
 
 type BranchIssue = {
-  type: "naming" | "stale" | "merge_conflict" | "diverged"
-  severity: "error" | "warning"
-  description: string
-  fix_suggestion?: string
-}
+  type: "naming" | "stale" | "merge_conflict" | "diverged";
+  severity: "error" | "warning";
+  description: string;
+  fix_suggestion?: string;
+};
 
 type BranchReport = {
-  ok: boolean
-  current_branch: string
-  base_branch: string
-  is_valid: boolean
-  naming_valid: boolean
-  up_to_date: boolean
-  has_conflicts: boolean
-  commits_ahead: number
-  commits_behind: number
-  issues: BranchIssue[]
-  passed: boolean
-  error?: string
-}
+  ok: boolean;
+  current_branch: string;
+  base_branch: string;
+  is_valid: boolean;
+  naming_valid: boolean;
+  up_to_date: boolean;
+  has_conflicts: boolean;
+  commits_ahead: number;
+  commits_behind: number;
+  issues: BranchIssue[];
+  passed: boolean;
+  error?: string;
+};
 
-async function runCommand(
+function runCommand(
   command: string[],
   timeoutMs: number,
 ): Promise<{ exitCode: number; stdout: string; stderr: string }> {
@@ -31,48 +32,51 @@ async function runCommand(
     const proc = spawn(command[0], command.slice(1), {
       shell: false,
       cwd: process.cwd(),
-    })
+    });
 
-    let stdout = ""
-    let stderr = ""
-    let timedOut = false
+    let stdout = "";
+    let stderr = "";
+    let timedOut = false;
 
     const timer = setTimeout(() => {
-      timedOut = true
-      proc.kill("SIGKILL")
-    }, timeoutMs)
+      timedOut = true;
+      proc.kill("SIGKILL");
+    }, timeoutMs);
 
     proc.stdout.on("data", (chunk) => {
-      stdout += chunk.toString("utf8")
-    })
+      stdout += chunk.toString("utf8");
+    });
 
     proc.stderr.on("data", (chunk) => {
-      stderr += chunk.toString("utf8")
-    })
+      stderr += chunk.toString("utf8");
+    });
 
     proc.on("close", (code) => {
-      clearTimeout(timer)
+      clearTimeout(timer);
       resolve({
         exitCode: timedOut ? -1 : code ?? -1,
         stdout,
         stderr: timedOut ? "Timed out" : stderr,
-      })
-    })
+      });
+    });
 
     proc.on("error", (err) => {
-      clearTimeout(timer)
+      clearTimeout(timer);
       resolve({
         exitCode: -1,
         stdout,
         stderr: err.message,
-      })
-    })
-  })
+      });
+    });
+  });
 }
 
 async function getCurrentBranch(timeoutMs: number): Promise<string> {
-  const result = await runCommand(["git", "branch", "--show-current"], timeoutMs)
-  return result.stdout.trim()
+  const result = await runCommand(
+    ["git", "branch", "--show-current"],
+    timeoutMs,
+  );
+  return result.stdout.trim();
 }
 
 async function getCommitsBehindAhead(
@@ -81,42 +85,55 @@ async function getCommitsBehindAhead(
   timeoutMs: number,
 ): Promise<{ behind: number; ahead: number }> {
   const result = await runCommand(
-    ["git", "rev-list", "--left-right", "--count", `${baseBranch}...${currentBranch}`],
+    [
+      "git",
+      "rev-list",
+      "--left-right",
+      "--count",
+      `${baseBranch}...${currentBranch}`,
+    ],
     timeoutMs,
-  )
+  );
 
   if (result.exitCode !== 0) {
-    return { behind: 0, ahead: 0 }
+    return { behind: 0, ahead: 0 };
   }
 
-  const parts = result.stdout.trim().split("\t")
-  const behind = parseInt(parts[0] || "0", 10)
-  const ahead = parseInt(parts[1] || "0", 10)
+  const parts = result.stdout.trim().split("\t");
+  const behind = parseInt(parts[0] || "0", 10);
+  const ahead = parseInt(parts[1] || "0", 10);
 
-  return { behind, ahead }
+  return { behind, ahead };
 }
 
-async function checkMergeConflicts(
+async function _checkMergeConflicts(
   currentBranch: string,
   baseBranch: string,
   timeoutMs: number,
 ): Promise<boolean> {
   // Try a test merge to see if there would be conflicts
   const result = await runCommand(
-    ["git", "merge-tree", `$(git merge-base ${baseBranch} ${currentBranch})`, baseBranch, currentBranch],
+    [
+      "git",
+      "merge-tree",
+      `$(git merge-base ${baseBranch} ${currentBranch})`,
+      baseBranch,
+      currentBranch,
+    ],
     timeoutMs,
-  )
+  );
 
-  return result.stdout.includes("<<<<<<< ")
+  return result.stdout.includes("<<<<<<< ");
 }
 
 function validateBranchName(branchName: string, pattern?: RegExp): boolean {
   // Default pattern: feature/*, fix/*, hotfix/*, release/*, chore/*, docs/*
-  const defaultPattern = /^(feature|fix|hotfix|release|chore|docs|refactor|test)\/[a-z0-9-]+$/
+  const defaultPattern =
+    /^(feature|fix|hotfix|release|chore|docs|refactor|test)\/[a-z0-9-]+$/;
 
-  const patternToUse = pattern || defaultPattern
+  const patternToUse = pattern || defaultPattern;
 
-  return patternToUse.test(branchName)
+  return patternToUse.test(branchName);
 }
 
 export default tool({
@@ -131,12 +148,16 @@ export default tool({
     naming_pattern: tool.schema
       .string()
       .optional()
-      .describe("Optional regex pattern for branch naming (default: type/name format)"),
+      .describe(
+        "Optional regex pattern for branch naming (default: type/name format)",
+      ),
 
     max_commits_behind: tool.schema
       .number()
       .optional()
-      .describe("Maximum commits behind base branch before flagging as error (default: 10)"),
+      .describe(
+        "Maximum commits behind base branch before flagging as error (default: 10)",
+      ),
 
     timeout_ms: tool.schema
       .number()
@@ -145,17 +166,17 @@ export default tool({
   },
 
   async execute(args) {
-    const baseBranch = args.base_branch ?? "main"
+    const baseBranch = args.base_branch ?? "main";
     const namingPattern = args.naming_pattern
       ? new RegExp(args.naming_pattern)
-      : undefined
-    const maxBehind = args.max_commits_behind ?? 10
-    const timeoutMs = args.timeout_ms ?? 15_000
+      : undefined;
+    const maxBehind = args.max_commits_behind ?? 10;
+    const timeoutMs = args.timeout_ms ?? 15_000;
 
-    const issues: BranchIssue[] = []
+    const issues: BranchIssue[] = [];
 
     try {
-      const currentBranch = await getCurrentBranch(timeoutMs)
+      const currentBranch = await getCurrentBranch(timeoutMs);
 
       if (!currentBranch) {
         return {
@@ -171,7 +192,7 @@ export default tool({
           issues: [],
           passed: false,
           error: "Not on a branch (detached HEAD?)",
-        } as BranchReport
+        } as BranchReport;
       }
 
       // Skip validation if on base branch
@@ -188,18 +209,20 @@ export default tool({
           commits_behind: 0,
           issues: [],
           passed: true,
-        } as BranchReport
+        } as BranchReport;
       }
 
       // Validate branch naming
-      const namingValid = validateBranchName(currentBranch, namingPattern)
+      const namingValid = validateBranchName(currentBranch, namingPattern);
       if (!namingValid) {
         issues.push({
           type: "naming",
           severity: "error",
-          description: `Branch name '${currentBranch}' does not follow naming convention`,
-          fix_suggestion: "Use format: type/description (e.g., feature/user-auth, fix/login-bug)",
-        })
+          description:
+            `Branch name '${currentBranch}' does not follow naming convention`,
+          fix_suggestion:
+            "Use format: type/description (e.g., feature/user-auth, fix/login-bug)",
+        });
       }
 
       // Check if branch is behind/ahead
@@ -207,40 +230,44 @@ export default tool({
         currentBranch,
         baseBranch,
         timeoutMs,
-      )
+      );
 
       if (behind > 0) {
-        const severity = behind > maxBehind ? "error" : "warning"
+        const severity = behind > maxBehind ? "error" : "warning";
         issues.push({
           type: "stale",
           severity,
           description: `Branch is ${behind} commit(s) behind ${baseBranch}`,
-          fix_suggestion: `Run: git merge ${baseBranch} or git rebase ${baseBranch}`,
-        })
+          fix_suggestion:
+            `Run: git merge ${baseBranch} or git rebase ${baseBranch}`,
+        });
       }
 
       if (behind > 0 && ahead > 0) {
         issues.push({
           type: "diverged",
           severity: "warning",
-          description: `Branch has diverged: ${ahead} ahead, ${behind} behind ${baseBranch}`,
+          description:
+            `Branch has diverged: ${ahead} ahead, ${behind} behind ${baseBranch}`,
           fix_suggestion: `Consider rebasing or merging ${baseBranch}`,
-        })
+        });
       }
 
       // Check for potential merge conflicts (simplified check)
-      const hasConflicts = behind > 0 // && await checkMergeConflicts(currentBranch, baseBranch, timeoutMs)
+      const hasConflicts = behind > 0; // && await checkMergeConflicts(currentBranch, baseBranch, timeoutMs)
       if (hasConflicts && behind > maxBehind) {
         issues.push({
           type: "merge_conflict",
           severity: "warning",
           description: "Branch may have merge conflicts with base branch",
-          fix_suggestion: "Merge base branch and resolve conflicts before creating PR",
-        })
+          fix_suggestion:
+            "Merge base branch and resolve conflicts before creating PR",
+        });
       }
 
-      const upToDate = behind === 0
-      const passed = namingValid && issues.filter((i) => i.severity === "error").length === 0
+      const upToDate = behind === 0;
+      const passed = namingValid &&
+        issues.filter((i) => i.severity === "error").length === 0;
 
       return {
         ok: true,
@@ -254,8 +281,8 @@ export default tool({
         commits_behind: behind,
         issues,
         passed,
-      } as BranchReport
-    } catch (err: any) {
+      } as BranchReport;
+    } catch (err: unknown) {
       return {
         ok: false,
         current_branch: "",
@@ -269,7 +296,7 @@ export default tool({
         issues: [],
         passed: false,
         error: err?.message ?? "Failed to validate branch strategy",
-      } as BranchReport
+      } as BranchReport;
     }
   },
-})
+});

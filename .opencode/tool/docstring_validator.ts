@@ -1,43 +1,44 @@
-import { tool } from "@opencode-ai/plugin"
-import { spawn } from "node:child_process"
+import { tool } from "@opencode-ai/plugin";
+import { spawn } from "node:child_process";
+import process from "node:process";
 
 type DocstringIssue = {
-  type: "missing" | "incomplete" | "mismatch" | "invalid_format"
-  severity: "error" | "warning"
-  description: string
-  line?: number
-}
+  type: "missing" | "incomplete" | "mismatch" | "invalid_format";
+  severity: "error" | "warning";
+  description: string;
+  line?: number;
+};
 
 type FunctionValidation = {
-  name: string
-  line: number
-  has_docstring: boolean
-  param_count: number
-  documented_params: string[]
-  actual_params: string[]
-  missing_params: string[]
-  extra_params: string[]
-  has_return_doc: boolean
-  has_return_annotation: boolean
-  issues: DocstringIssue[]
-  valid: boolean
-}
+  name: string;
+  line: number;
+  has_docstring: boolean;
+  param_count: number;
+  documented_params: string[];
+  actual_params: string[];
+  missing_params: string[];
+  extra_params: string[];
+  has_return_doc: boolean;
+  has_return_annotation: boolean;
+  issues: DocstringIssue[];
+  valid: boolean;
+};
 
 type ValidationReport = {
-  ok: boolean
-  file_path: string
-  functions: FunctionValidation[]
+  ok: boolean;
+  file_path: string;
+  functions: FunctionValidation[];
   summary: {
-    total_functions: number
-    valid_count: number
-    invalid_count: number
-    missing_docstring_count: number
-    total_issues: number
-  }
-  error?: string
-}
+    total_functions: number;
+    valid_count: number;
+    invalid_count: number;
+    missing_docstring_count: number;
+    total_issues: number;
+  };
+  error?: string;
+};
 
-async function runCommand(
+function runCommand(
   command: string[],
   timeoutMs: number,
 ): Promise<{ exitCode: number; stdout: string; stderr: string }> {
@@ -45,43 +46,43 @@ async function runCommand(
     const proc = spawn(command[0], command.slice(1), {
       shell: false,
       cwd: process.cwd(),
-    })
+    });
 
-    let stdout = ""
-    let stderr = ""
-    let timedOut = false
+    let stdout = "";
+    let stderr = "";
+    let timedOut = false;
 
     const timer = setTimeout(() => {
-      timedOut = true
-      proc.kill("SIGKILL")
-    }, timeoutMs)
+      timedOut = true;
+      proc.kill("SIGKILL");
+    }, timeoutMs);
 
     proc.stdout.on("data", (chunk) => {
-      stdout += chunk.toString("utf8")
-    })
+      stdout += chunk.toString("utf8");
+    });
 
     proc.stderr.on("data", (chunk) => {
-      stderr += chunk.toString("utf8")
-    })
+      stderr += chunk.toString("utf8");
+    });
 
     proc.on("close", (code) => {
-      clearTimeout(timer)
+      clearTimeout(timer);
       resolve({
         exitCode: timedOut ? -1 : code ?? -1,
         stdout,
         stderr: timedOut ? "Timed out" : stderr,
-      })
-    })
+      });
+    });
 
     proc.on("error", (err) => {
-      clearTimeout(timer)
+      clearTimeout(timer);
       resolve({
         exitCode: -1,
         stdout,
         stderr: err.message,
-      })
-    })
-  })
+      });
+    });
+  });
 }
 
 async function validateDocstrings(
@@ -199,21 +200,21 @@ if __name__ == '__main__':
     filepath = sys.argv[1]
     validations = validate_file(filepath)
     print(json.dumps(validations, indent=2))
-`
+`;
 
   const result = await runCommand(
     ["python3", "-c", pythonScript, filePath],
     timeoutMs,
-  )
+  );
 
   if (result.exitCode !== 0) {
-    return []
+    return [];
   }
 
   try {
-    return JSON.parse(result.stdout)
+    return JSON.parse(result.stdout);
   } catch {
-    return []
+    return [];
   }
 }
 
@@ -237,20 +238,22 @@ export default tool({
   },
 
   async execute(args) {
-    const filePath = args.file_path
-    const strictMode = args.strict_mode ?? false
-    const timeoutMs = args.timeout_ms ?? 30_000
+    const filePath = args.file_path;
+    const _strictMode = args.strict_mode ?? false;
+    const timeoutMs = args.timeout_ms ?? 30_000;
 
     try {
-      const validations = await validateDocstrings(filePath, timeoutMs)
+      const validations = await validateDocstrings(filePath, timeoutMs);
 
-      const validCount = validations.filter((v) => v.valid).length
-      const invalidCount = validations.length - validCount
-      const missingDocstringCount = validations.filter((v) => !v.has_docstring).length
+      const validCount = validations.filter((v) => v.valid).length;
+      const invalidCount = validations.length - validCount;
+      const missingDocstringCount = validations.filter((v) =>
+        !v.has_docstring
+      ).length;
       const totalIssues = validations.reduce(
         (sum, v) => sum + v.issues.length,
         0,
-      )
+      );
 
       return {
         ok: true,
@@ -263,8 +266,8 @@ export default tool({
           missing_docstring_count: missingDocstringCount,
           total_issues: totalIssues,
         },
-      } as ValidationReport
-    } catch (err: any) {
+      } as ValidationReport;
+    } catch (err: unknown) {
       return {
         ok: false,
         file_path: filePath,
@@ -277,7 +280,7 @@ export default tool({
           total_issues: 0,
         },
         error: err?.message ?? "Failed to validate docstrings",
-      } as ValidationReport
+      } as ValidationReport;
     }
   },
-})
+});
