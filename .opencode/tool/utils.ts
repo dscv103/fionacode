@@ -35,7 +35,7 @@ const ALLOWED_COMMANDS = [
  * @param command - Command name to validate
  * @returns True if valid, false otherwise
  */
-function isValidCommandName(command: string): boolean {
+function isValidCommandName(command: string): command is typeof ALLOWED_COMMANDS[number] {
   // Must be alphanumeric with hyphens, underscores, or dots
   // No path separators, no special shell characters
   const validPattern = /^[a-zA-Z0-9_.-]+$/;
@@ -45,7 +45,7 @@ function isValidCommandName(command: string): boolean {
   }
   
   // Check against allowlist
-  return ALLOWED_COMMANDS.includes(command as any);
+  return (ALLOWED_COMMANDS as readonly string[]).includes(command);
 }
 
 /**
@@ -76,7 +76,6 @@ export function runCommand(
   return new Promise((resolve) => {
     const proc = spawn(command, args, {
       shell: false,
-      timeout: timeoutMs,
     });
 
     let stdout = '';
@@ -165,6 +164,9 @@ export async function checkPythonPackage(
 
   try {
     // Use explicit arguments instead of shell interpolation
+    // Note: While this constructs a Python string with the package name, it's safe because
+    // we've validated packageName against Python identifier rules above, preventing any
+    // code injection. The validation ensures packageName can only contain safe characters.
     const pythonCode = `import ${packageName}; print(${packageName}.__version__ if hasattr(${packageName}, '__version__') else 'installed')`;
     const result = await runCommand('python3', ['-c', pythonCode], 5000);
     
