@@ -21,8 +21,9 @@ This repository contains OpenCode, an open-source AI coding agent. Follow these 
 ### Type Safety
 
 - **Always add type annotations** to all function signatures and methods
-- Use appropriate types from the `typing` module (Optional, Union, List, Dict, etc.)
-- Use Python 3.13+ type syntax where applicable
+- Use Python 3.10+ union syntax (`str | None`) instead of `typing.Optional`
+- Use Python 3.9+ built-in generics (`list[str]`, `dict[str, int]`) instead of `typing.List`, `typing.Dict`
+- Use modern Python 3.13+ type features where applicable
 - All code must pass `mypy --strict` checks
 - Optionally verify with `pyright` for additional type checking
 - Fix all type errors before considering code complete
@@ -56,8 +57,8 @@ This repository contains OpenCode, an open-source AI coding agent. Follow these 
 # Run tests
 pytest -v tests/
 
-# Check test coverage
-pytest --cov=<module>
+# Check test coverage (replace 'src' with actual module path)
+pytest --cov=src
 
 # Run type checks
 mypy --strict <files>
