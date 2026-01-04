@@ -1,0 +1,474 @@
+---
+title: Custom Tools
+description: Create tools the LLM can call in opencode.
+---
+
+Custom tools are functions you create that the LLM can call during conversations. They work alongside opencode's [built-in tools](/docs/tools) like `read`, `write`, and `bash`.
+
+---
+
+## Creating a tool
+
+Tools are defined as **TypeScript** or **JavaScript** files. However, the tool definition can invoke scripts written in **any language** — TypeScript or JavaScript is only used for the tool definition itself.
+
+---
+
+### Location
+
+They can be defined:
+
+- Locally by placing them in the `.opencode/tool/` directory of your project.
+- Or globally, by placing them in `~/.config/opencode/tool/`.
+
+---
+
+### Structure
+
+The easiest way to create tools is using the `tool()` helper which provides type-safety and validation.
+
+```ts title=".opencode/tool/database.ts" {1}
+import { tool } from "@opencode-ai/plugin"
+
+export default tool({
+  description: "Query the project database",
+  args: {
+    query: tool.schema.string().describe("SQL query to execute"),
+  },
+  async execute(args) {
+    // Your database logic here
+    return `Executed query: ${args.query}`
+  },
+})
+```
+
+The **filename** becomes the **tool name**. The above creates a `database` tool.
+
+---
+
+#### Multiple tools per file
+
+You can also export multiple tools from a single file. Each export becomes **a separate tool** with the name **`<filename>_<exportname>`**:
+
+```ts title=".opencode/tool/math.ts"
+import { tool } from "@opencode-ai/plugin"
+
+export const add = tool({
+  description: "Add two numbers",
+  args: {
+    a: tool.schema.number().describe("First number"),
+    b: tool.schema.number().describe("Second number"),
+  },
+  async execute(args) {
+    return args.a + args.b
+  },
+})
+
+export const multiply = tool({
+  description: "Multiply two numbers",
+  args: {
+    a: tool.schema.number().describe("First number"),
+    b: tool.schema.number().describe("Second number"),
+  },
+  async execute(args) {
+    return args.a * args.b
+  },
+})
+```
+
+This creates two tools: `math_add` and `math_multiply`.
+
+---
+
+### Arguments
+
+You can use `tool.schema`, which is just [Zod](https://zod.dev), to define argument types.
+
+```ts "tool.schema"
+args: {
+  query: tool.schema.string().describe("SQL query to execute")
+}
+```
+
+You can also import [Zod](https://zod.dev) directly and return a plain object:
+
+```ts {6}
+import { z } from "zod"
+
+export default {
+  description: "Tool description",
+  args: {
+    param: z.string().describe("Parameter description"),
+  },
+  async execute(args, context) {
+    // Tool implementation
+    return "result"
+  },
+}
+```
+
+---
+
+### Context
+
+Tools receive context about the current session:
+
+```ts title=".opencode/tool/project.ts" {8}
+import { tool } from "@opencode-ai/plugin"
+
+export default tool({
+  description: "Get project information",
+  args: {},
+  async execute(args, context) {
+    // Access context information
+    const { agent, sessionID, messageID } = context
+    return `Agent: ${agent}, Session: ${sessionID}, Message: ${messageID}`
+  },
+})
+```
+
+---
+
+## Examples
+
+### Write a tool in Python
+
+You can write your tools in any language you want. Here's an example that adds two numbers using Python.
+
+First, create the tool as a Python script:
+
+```python title=".opencode/tool/add.py"
+import sys
+
+a = int(sys.argv[1])
+b = int(sys.argv[2])
+print(a + b)
+```
+
+Then create the tool definition that invokes it:
+
+```ts title=".opencode/tool/python-add.ts" {10}
+import { tool } from "@opencode-ai/plugin"
+
+export default tool({
+  description: "Add two numbers using Python",
+  args: {
+    a: tool.schema.number().describe("First number"),
+    b: tool.schema.number().describe("Second number"),
+  },
+  async execute(args) {
+    const result = await Bun.$`python3 .opencode/tool/add.py ${args.a} ${args.b}`.text()
+    return result.trim()
+  },
+})
+```
+
+Here we are using the [`Bun.$`](https://bun.com/docs/runtime/shell) utility to run the Python script.
+
+---
+
+## Phase 1 Custom Tools
+
+This project includes four essential custom tools for multi-agent workflow orchestration and quality assurance.
+
+---
+
+### coverage_analyzer
+
+**Purpose**: Parse pytest coverage reports and produce structured metrics for agents to identify coverage gaps.
+
+**Agents**: Implementer, Code Review, Diagnostics, Executor
+
+**Inputs**:
+- `run_pytest` (boolean, optional): If true, runs pytest with coverage; if false, parses existing coverage.json (default: true)
+- `coverage_file` (string, optional): Path to coverage.json (default: "coverage.json")
+- `pytest_args` (array, optional): Additional pytest arguments (default: ["--cov", "--cov-report=json"])
+- `timeout_ms` (number, optional): Timeout in milliseconds (default: 300000)
+- `threshold` (number, optional): Branch coverage threshold percentage (default: 70.0)
+
+**Outputs**:
+- `ok` (boolean): Whether the operation succeeded
+- `summary`: Total/covered statements and branches, line/branch coverage percentages, file count
+- `files`: Array of file-level coverage with paths, percentages, missing lines/branches, and severity classification
+- `passed` (boolean): Whether coverage meets the threshold
+- `threshold` (number): The coverage threshold used
+- `error` (string, optional): Error message if parsing failed
+
+**Example**:
+```ts
+// Run pytest and analyze coverage
+const result = await coverage_analyzer({
+  run_pytest: true,
+  threshold: 80.0
+})
+
+// Parse existing coverage.json
+const result = await coverage_analyzer({
+  run_pytest: false,
+  coverage_file: "coverage.json"
+})
+```
+
+---
+
+### exit_criteria_checker
+
+**Purpose**: Evaluate workflow exit criteria from test/coverage/typecheck/review results to automate the "approve vs iterate" decision.
+
+**Agents**: Orchestrator, Code Review
+
+**Inputs**:
+- `tests_passed` (boolean, optional): Whether the test suite passed
+- `branch_coverage` (number, optional): Branch coverage percentage
+- `type_checks_passed` (boolean, optional): Whether type checks passed (mypy/pyright/tsc)
+- `critical_issues_count` (number, optional): Count of critical issues from review (must be 0 to approve)
+- `notes` (string, optional): Optional context from the agent
+
+**Outputs**:
+- `ok` (boolean): Whether the operation succeeded
+- `decision` (string): "approve" or "iterate"
+- `score` (number): Percentage score 0-100 based on met criteria
+- `thresholds`: The thresholds used for each criterion
+- `inputs`: Echo of the input values
+- `criteria`: Detailed breakdown of each criterion (met, value, threshold, reason)
+- `unmet`: Array of unmet criteria with details
+- `summary` (string): Human-readable summary
+
+**Example**:
+```ts
+const result = await exit_criteria_checker({
+  tests_passed: true,
+  branch_coverage: 85.3,
+  type_checks_passed: true,
+  critical_issues_count: 0
+})
+// result.decision === "approve", result.score === 100
+```
+
+---
+
+### type_check_aggregator
+
+**Purpose**: Run mypy/pyright and consolidate errors by severity and file, providing actionable summaries for the review loop.
+
+**Agents**: Implementer, Code Review, Diagnostics
+
+**Inputs**:
+- `profile` (enum: "pyright" | "ty" | "both"): Which type checker profile to run
+- `timeout_ms` (number, optional): Timeout per command in milliseconds (default: 180000)
+
+**Outputs**:
+- `ok` (boolean): Always true (operation completed)
+- `profile` (string): The profile that was run
+- `passed` (boolean): Whether all checks passed with no errors
+- `counts`: Aggregate error/warning/info counts
+- `files`: Array of files with diagnostics, sorted by severity and error count
+- `diagnostics`: Array of all diagnostics with checker, path, line, column, severity, category, code, message
+- `runs`: Array of command run results with stdout/stderr/exitCode
+
+**Example**:
+```ts
+const result = await type_check_aggregator({
+  profile: "both",
+  timeout_ms: 120000
+})
+
+// result.passed indicates if type checks passed
+// result.files groups diagnostics by file
+// result.counts provides aggregate metrics
+```
+
+---
+
+### task_tracker
+
+**Purpose**: Maintain persistent structured state for subtasks, dependencies, blockers, and artifacts across workflow iterations.
+
+**Agents**: Orchestrator, Planning
+
+**Inputs**:
+- `action` (enum): "init" | "create_task" | "update_task" | "set_status" | "link_dep" | "add_blocker" | "clear_blocker" | "attach_artifact" | "get_snapshot"
+- `force` (boolean, optional): If true, overwrite state on init
+- `task_id` (string, optional): Task UUID (required for most actions)
+- `title` (string, optional): Task title (required for create_task)
+- `status` (enum, optional): "todo" | "in_progress" | "blocked" | "done"
+- `depends_on` (string, optional): Dependency task UUID for link_dep
+- `blocker_reason` (string, optional): Blocker description for add_blocker
+- `blocker_id` (string, optional): Blocker UUID for clear_blocker
+- `artifact_path` (string, optional): Artifact path for attach_artifact
+- `artifact_type` (string, optional): Artifact type (e.g., "code", "test", "doc")
+- `artifact_note` (string, optional): Optional artifact note
+
+**Outputs**:
+- `ok` (boolean): Whether the operation succeeded
+- `message` (string, optional): Status message
+- `task_id` (string, optional): Task UUID
+- `path` (string): Path to task_tracker.json state file
+- `state` (object, optional): Full state snapshot (for get_snapshot action)
+
+**Example**:
+```ts
+// Initialize tracker
+await task_tracker({ action: "init" })
+
+// Create a task
+const task = await task_tracker({
+  action: "create_task",
+  title: "Implement user authentication"
+})
+
+// Update status
+await task_tracker({
+  action: "set_status",
+  task_id: task.task_id,
+  status: "in_progress"
+})
+
+// Get full snapshot
+const snapshot = await task_tracker({ action: "get_snapshot" })
+```
+
+---
+
+**Note**: All Phase 1 tools are implemented in TypeScript/JavaScript and can invoke Python scripts for complex processing. They return structured JSON for agent consumption and are designed to be thin wrappers that agents can easily interpret.
+
+---
+
+## Phase 2 Custom Tools
+
+Three high-value tools for testing efficiency, security, and release management.
+
+---
+
+### test_runner_smart
+
+**Purpose**: Run only tests affected by changed files (delta testing) to speed up iteration cycles by 10-100x for large codebases.
+
+**Agents**: Executor, Implementer, Diagnostics
+
+**Inputs**:
+- `mode` (enum, optional): "auto" (default, detects changes), "all" (run all tests), "affected" (only changed), "specific" (provided files)
+- `test_files` (array, optional): Specific test files to run (for mode='specific')
+- `pytest_args` (array, optional): Additional pytest arguments (e.g., ['-k', 'test_foo', '--maxfail=1'])
+- `timeout_ms` (number, optional): Timeout in milliseconds (default: 300000)
+
+**Outputs**:
+- `ok` (boolean): Whether the operation succeeded
+- `mode` (string): The mode that was executed
+- `changed_files` (array): List of changed Python files from git diff
+- `affected_test_files` (array): Test files identified as affected
+- `total_tests` (number): Total number of tests run
+- `passed_tests` (number): Number of passed tests
+- `failed_tests` (number): Number of failed tests
+- `skipped_tests` (number): Number of skipped tests
+- `duration_ms` (number): Execution duration in milliseconds
+- `all_passed` (boolean): Whether all tests passed
+- `results` (array): Individual test results with file, passed status, duration, failures
+- `pytest_output` (string): Full pytest stdout/stderr
+- `error` (string, optional): Error message if operation failed
+
+**Example**:
+```ts
+// Auto-detect changed files and run affected tests
+const result = await test_runner_smart({ mode: "auto" })
+
+// Run specific test files
+const result = await test_runner_smart({
+  mode: "specific",
+  test_files: ["tests/test_auth.py", "tests/test_api.py"]
+})
+
+// Run all tests with custom pytest args
+const result = await test_runner_smart({
+  mode: "all",
+  pytest_args: ["-v", "--maxfail=3"]
+})
+```
+
+---
+
+### dependency_auditor
+
+**Purpose**: Audit Python dependencies for known vulnerabilities (CVEs), license conflicts, and outdated packages using pip-audit, safety, and pip-licenses.
+
+**Agents**: Security Review, Compliance, Integration
+
+**Inputs**:
+- `check_vulnerabilities` (boolean, optional): Check for security vulnerabilities (default: true)
+- `check_licenses` (boolean, optional): Check for license issues (default: true)
+- `check_outdated` (boolean, optional): Check for outdated packages (default: true)
+- `timeout_ms` (number, optional): Timeout per check in milliseconds (default: 60000)
+
+**Outputs**:
+- `ok` (boolean): Whether the operation succeeded
+- `vulnerabilities` (array): List of vulnerabilities with package, version, vulnerability_id, severity, description, fixed_in
+- `license_issues` (array): List of license issues with package, version, license, issue_type, description
+- `outdated_packages` (array): List of outdated packages with package, current_version, latest_version, update_type
+- `vulnerability_counts` (object): Counts by severity (critical, high, medium, low)
+- `total_vulnerabilities` (number): Total number of vulnerabilities found
+- `total_license_issues` (number): Total license issues found
+- `total_outdated` (number): Total outdated packages
+- `passed` (boolean): True if no critical or high severity vulnerabilities
+- `error` (string, optional): Error message if operation failed
+
+**Example**:
+```ts
+// Full audit
+const result = await dependency_auditor({})
+
+// Only check vulnerabilities
+const result = await dependency_auditor({
+  check_vulnerabilities: true,
+  check_licenses: false,
+  check_outdated: false
+})
+
+// result.passed indicates if security checks passed
+// result.vulnerabilities contains detailed CVE information
+```
+
+---
+
+### changelog_generator
+
+**Purpose**: Generate structured changelog from git commit messages using conventional commit format. Groups changes by type and identifies breaking changes.
+
+**Agents**: Communication, Integration
+
+**Inputs**:
+- `from_ref` (string, optional): Starting git reference (tag, commit, branch). Default: latest tag or HEAD~10
+- `to_ref` (string, optional): Ending git reference (default: HEAD)
+- `version` (string, optional): Version string for the changelog header (e.g., '1.2.0')
+- `timeout_ms` (number, optional): Timeout in milliseconds (default: 30000)
+
+**Outputs**:
+- `ok` (boolean): Whether the operation succeeded
+- `version` (string, optional): Version string used in header
+- `date` (string): ISO date string for the changelog
+- `sections` (array): Sections with title and commits (Features, Bug Fixes, Documentation, etc.)
+- `breaking_changes` (array): List of commits marked as breaking changes
+- `total_commits` (number): Total commits processed
+- `markdown` (string): Full formatted markdown changelog
+- `error` (string, optional): Error message if operation failed
+
+**Example**:
+```ts
+// Generate changelog from latest tag to HEAD
+const result = await changelog_generator({
+  version: "1.2.0"
+})
+
+// Generate from specific commit range
+const result = await changelog_generator({
+  from_ref: "v1.1.0",
+  to_ref: "main",
+  version: "1.2.0"
+})
+
+// result.markdown contains the formatted changelog
+// result.breaking_changes lists any breaking changes
+```
+
+---
+
+**Note**: Phase 2 tools build on Phase 1 capabilities to provide testing efficiency (delta testing), security auditing (vulnerability/license scanning), and release automation (conventional changelog generation). All tools follow the thin-wrapper pattern with structured JSON outputs.
+````
