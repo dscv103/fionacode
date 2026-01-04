@@ -10,6 +10,12 @@ import { spawn } from 'child_process';
 export const MAX_OUTPUT_SIZE = 10 * 1024 * 1024;
 
 /**
+ * Exit code constants for command execution
+ */
+const TIMEOUT_EXIT_CODE = -1;
+const ERROR_EXIT_CODE = -1;
+
+/**
  * Allowlist of known safe commands that tools may check for
  * This list can be extended as needed for new tools
  */
@@ -35,7 +41,7 @@ const ALLOWED_COMMANDS = [
  * @param command - Command name to validate
  * @returns True if valid, false otherwise
  */
-function isValidCommandName(command: string): command is typeof ALLOWED_COMMANDS[number] {
+function isValidCommandName(command: string): boolean {
   // Must be alphanumeric with hyphens, underscores, or dots
   // No path separators, no special shell characters
   const validPattern = /^[a-zA-Z0-9_.-]+$/;
@@ -98,7 +104,7 @@ export function runCommand(
     proc.on('close', (code) => {
       clearTimeout(timer);
       resolve({
-        exitCode: timedOut ? -1 : code ?? -1,
+        exitCode: timedOut ? TIMEOUT_EXIT_CODE : code ?? ERROR_EXIT_CODE,
         stdout,
         stderr: timedOut ? 'Command timed out' : stderr,
       });
@@ -107,7 +113,7 @@ export function runCommand(
     proc.on('error', (err) => {
       clearTimeout(timer);
       resolve({
-        exitCode: -1,
+        exitCode: ERROR_EXIT_CODE,
         stdout,
         stderr: err.message,
       });
@@ -164,9 +170,11 @@ export async function checkPythonPackage(
 
   try {
     // Use explicit arguments instead of shell interpolation
-    // Note: While this constructs a Python string with the package name, it's safe because
-    // we've validated packageName against Python identifier rules above, preventing any
-    // code injection. The validation ensures packageName can only contain safe characters.
+    // SECURITY NOTE: While this constructs a Python string with the package name, it's safe because:
+    // 1. We've validated packageName against Python identifier rules (only letters, numbers, underscores, dots)
+    // 2. The validation prevents any shell metacharacters or code injection attempts
+    // 3. This is the standard approach for checking Python package availability
+    // 4. Alternative approaches (like using pip show) would be less reliable for checking if a package is importable
     const pythonCode = `import ${packageName}; print(${packageName}.__version__ if hasattr(${packageName}, '__version__') else 'installed')`;
     const result = await runCommand('python3', ['-c', pythonCode], 5000);
     
