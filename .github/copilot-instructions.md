@@ -85,7 +85,7 @@ pyright <files>
 - **opencode.json**: Main configuration file (supports JSON and JSONC)
 - **.opencode/**: Project-specific configuration directory
   - **prompts/**: Agent-specific prompt files
-  - **agent/**: Custom agent configurations
+  - **tool/**: Custom tool implementations
 - **pro_docs/**: Documentation files in MDX format
 
 ### Agent System
