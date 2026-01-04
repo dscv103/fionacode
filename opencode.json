@@ -13,7 +13,9 @@
         "list": true,
         "webfetch": true,
         "task_tracker": true,
-        "exit_criteria_checker": true
+        "exit_criteria_checker": true,
+        "branch_strategy_enforcer": true,
+        "agent_handoff_validator": true
       },
       "permissions": {
         "edit": "ask",
@@ -35,7 +37,8 @@
         "list": true,
         "type_check_aggregator": true,
         "coverage_analyzer": true,
-        "test_runner_smart": true
+        "test_runner_smart": true,
+        "fixture_generator": true
       },
       "permissions": {
         "edit": "allow",
@@ -57,7 +60,10 @@
         "type_check_aggregator": true,
         "exit_criteria_checker": true,
         "search": true,
-        "list": true
+        "list": true,
+        "code_complexity_scorer": true,
+        "docstring_validator": true,
+        "api_diff_reporter": true
       },
       "permissions": {
         "edit": "deny",
@@ -138,7 +144,8 @@
         "edit": false,
         "bash": true,
         "search": true,
-        "list": true
+        "list": true,
+        "flakiness_detector": true
       },
       "permissions": {
         "edit": "deny",
@@ -179,7 +186,8 @@
         "bash": false,
         "search": true,
         "list": true,
-        "webfetch": false
+        "webfetch": false,
+        "docstring_validator": true
       },
       "permissions": {
         "edit": "allow",
@@ -222,7 +230,8 @@
         "type_check_aggregator": true,
         "test_runner_smart": true,
         "search": true,
-        "list": true
+        "list": true,
+        "flakiness_detector": true
       },
       "permissions": {
         "edit": "deny",
@@ -241,7 +250,8 @@
         "edit": true,
         "bash": true,
         "search": true,
-        "list": true
+        "list": true,
+        "code_complexity_scorer": true
       },
       "permissions": {
         "edit": "ask",
@@ -264,7 +274,9 @@
         "webfetch": true,
         "github_*": true,
         "dependency_auditor": true,
-        "changelog_generator": true
+        "changelog_generator": true,
+        "smart_commit_builder": true,
+        "branch_strategy_enforcer": true
       },
       "permissions": {
         "edit": "ask",
@@ -286,7 +298,9 @@
         "list": true,
         "webfetch": false,
         "github_*": true,
-        "changelog_generator": true
+        "changelog_generator": true,
+        "api_diff_reporter": true,
+        "smart_commit_builder": true
       },
       "permissions": {
         "edit": "allow",
