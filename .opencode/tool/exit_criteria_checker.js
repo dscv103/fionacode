@@ -1,14 +1,24 @@
 import { tool } from "@opencode-ai/plugin"
 import { spawn } from "node:child_process"
+import process from "node:process"
 
-function runPython(jsonPayload) {
+function runPython(jsonPayload, timeoutMs = 30000) {
   return new Promise((resolve, reject) => {
     const proc = spawn("python3", [".opencode/tool/exit_criteria_checker.py"], {
       stdio: ["pipe", "pipe", "pipe"],
+      cwd: process.cwd(), // Explicit cwd
     })
 
     let stdout = ""
     let stderr = ""
+    let timedOut = false
+
+    // Add timeout to prevent hanging
+    const timer = setTimeout(() => {
+      timedOut = true
+      proc.kill("SIGKILL")
+      reject(new Error("exit_criteria_checker.py timed out"))
+    }, timeoutMs)
 
     proc.stdout.on("data", (chunk) => {
       stdout += chunk.toString("utf8")
@@ -18,9 +28,18 @@ function runPython(jsonPayload) {
       stderr += chunk.toString("utf8")
     })
 
-    proc.on("error", (err) => reject(err))
+    proc.on("error", (err) => {
+      clearTimeout(timer)
+      reject(err)
+    })
 
     proc.on("close", (code) => {
+      clearTimeout(timer)
+      
+      if (timedOut) {
+        return // Already rejected
+      }
+      
       if (code !== 0) {
         reject(
           new Error(

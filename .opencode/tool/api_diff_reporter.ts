@@ -1,6 +1,19 @@
 import { tool } from "@opencode-ai/plugin";
 import { spawn } from "node:child_process";
 import process from "node:process";
+import path from "node:path";
+import fs from "node:fs";
+
+// Validate git ref/branch to prevent option injection
+function isValidGitRef(ref: string): boolean {
+  // Git refs can't start with - (would be interpreted as option)
+  // and should follow git ref naming rules
+  if (ref.startsWith('-')) {
+    return false;
+  }
+  // Basic validation: refs should contain alphanumeric, /, _, -, ~, ^, but not control chars
+  return /^[a-zA-Z0-9\/._~^-]+$/.test(ref);
+}
 
 type APISymbol = {
   name: string;
@@ -85,17 +98,46 @@ async function extractAPIFromRef(
   filePath: string,
   timeoutMs: number,
 ): Promise<APISymbol[]> {
-  // Checkout the ref temporarily, extract API, then go back
+  // Validate file path is repo-relative and doesn't escape
+  const cwd = process.cwd();
+  const resolvedPath = path.resolve(cwd, filePath);
+  
+  // Ensure the path is within the repository and is a Python file
+  if (!resolvedPath.startsWith(cwd + path.sep) && resolvedPath !== cwd) {
+    throw new Error(`Invalid file path: ${filePath} is outside repository`);
+  }
+  
+  if (!filePath.endsWith('.py')) {
+    throw new Error(`Invalid file path: ${filePath} must be a Python file`);
+  }
+
+  // Validate ref to prevent option injection
+  if (!isValidGitRef(ref)) {
+    throw new Error(`Invalid git reference: ${ref}`);
+  }
+
+  // Use git show to read file content without checking out
+  // Use -- separator to prevent ref from being interpreted as option
+  const gitShowResult = await runCommand(
+    ["git", "show", "--", `${ref}:${filePath}`],
+    timeoutMs,
+  );
+
+  if (gitShowResult.exitCode !== 0) {
+    return []; // File doesn't exist at this ref
+  }
+
+  const fileContent = gitShowResult.stdout;
+
   const pythonScript = `
 import ast
 import json
 import sys
 
-def extract_public_api(filepath):
-    """Extract all public API symbols from a Python file."""
+def extract_public_api(content, filepath):
+    """Extract all public API symbols from Python content."""
     try:
-        with open(filepath, 'r') as f:
-            tree = ast.parse(f.read(), filepath)
+        tree = ast.parse(content, filepath)
     except:
         return []
     
@@ -109,7 +151,13 @@ def extract_public_api(filepath):
             for target in node.targets:
                 if isinstance(target, ast.Name) and target.id == '__all__':
                     if isinstance(node.value, (ast.List, ast.Tuple)):
-                        all_exports = [elt.s for elt in node.value.elts if isinstance(elt, ast.Str)]
+                        # Handle both ast.Str (Python < 3.8) and ast.Constant (Python >= 3.8)
+                        all_exports = []
+                        for elt in node.value.elts:
+                            if isinstance(elt, ast.Str):
+                                all_exports.append(elt.s)
+                            elif isinstance(elt, ast.Constant) and isinstance(elt.value, str):
+                                all_exports.append(elt.value)
     
     for node in tree.body:
         name = None
@@ -146,47 +194,61 @@ def extract_public_api(filepath):
     return symbols
 
 if __name__ == '__main__':
+    content = sys.stdin.read()
     filepath = sys.argv[1]
-    symbols = extract_public_api(filepath)
+    symbols = extract_public_api(content, filepath)
     print(json.dumps(symbols, indent=2))
 `;
 
-  // Save current HEAD
-  const saveResult = await runCommand(["git", "rev-parse", "HEAD"], 5000);
-  const originalRef = saveResult.stdout.trim();
+  // Pass file content via stdin to Python script
+  const proc = spawn("python3", ["-c", pythonScript, filePath], {
+    shell: false,
+    cwd: process.cwd(),
+  });
+
+  let stdout = "";
+  let stderr = "";
+  let timedOut = false;
+
+  const timer = setTimeout(() => {
+    timedOut = true;
+    proc.kill("SIGKILL");
+  }, timeoutMs);
+
+  proc.stdout.on("data", (chunk) => {
+    stdout += chunk.toString("utf8");
+  });
+
+  proc.stderr.on("data", (chunk) => {
+    stderr += chunk.toString("utf8");
+  });
+
+  // Write file content to stdin
+  proc.stdin.write(fileContent);
+  proc.stdin.end();
+
+  await new Promise<void>((resolve) => {
+    proc.on("close", () => {
+      clearTimeout(timer);
+      resolve();
+    });
+  });
+
+  if (timedOut || !stdout) {
+    return [];
+  }
 
   try {
-    // Checkout the ref
-    await runCommand(["git", "checkout", ref, "--quiet"], 10_000);
-
-    // Extract API
-    const result = await runCommand(
-      ["python3", "-c", pythonScript, filePath],
-      timeoutMs,
-    );
-
-    // Go back to original ref
-    await runCommand(["git", "checkout", originalRef, "--quiet"], 10_000);
-
-    if (result.exitCode !== 0) {
-      return [];
-    }
-
-    try {
-      return JSON.parse(result.stdout);
-    } catch {
-      return [];
-    }
+    return JSON.parse(stdout);
   } catch {
-    // Ensure we go back even on error
-    await runCommand(["git", "checkout", originalRef, "--quiet"], 10_000);
     return [];
   }
 }
 
 function compareAPIs(before: APISymbol[], after: APISymbol[]): APIDiff {
-  const beforeMap = new Map(before.map((s) => [s.name, s]));
-  const afterMap = new Map(after.map((s) => [s.name, s]));
+  // Key by (module, name) to avoid collisions across modules
+  const beforeMap = new Map(before.map((s) => [`${s.module}::${s.name}`, s]));
+  const afterMap = new Map(after.map((s) => [`${s.module}::${s.name}`, s]));
 
   const added: APISymbol[] = [];
   const removed: APISymbol[] = [];
@@ -194,11 +256,11 @@ function compareAPIs(before: APISymbol[], after: APISymbol[]): APIDiff {
   const unchanged: APISymbol[] = [];
 
   // Find added and modified
-  for (const [name, symbol] of afterMap) {
-    if (!beforeMap.has(name)) {
+  for (const [key, symbol] of afterMap) {
+    if (!beforeMap.has(key)) {
       added.push(symbol);
     } else {
-      const beforeSymbol = beforeMap.get(name)!;
+      const beforeSymbol = beforeMap.get(key)!;
       if (beforeSymbol.signature !== symbol.signature) {
         modified.push(symbol);
       } else {
@@ -208,8 +270,8 @@ function compareAPIs(before: APISymbol[], after: APISymbol[]): APIDiff {
   }
 
   // Find removed
-  for (const [name, symbol] of beforeMap) {
-    if (!afterMap.has(name)) {
+  for (const [key, symbol] of beforeMap) {
+    if (!afterMap.has(key)) {
       removed.push(symbol);
     }
   }

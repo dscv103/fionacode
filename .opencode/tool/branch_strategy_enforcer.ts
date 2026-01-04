@@ -2,6 +2,16 @@ import { tool } from "@opencode-ai/plugin";
 import { spawn } from "node:child_process";
 import process from "node:process";
 
+// Validate git ref/branch to prevent option injection
+function isValidGitRef(ref: string): boolean {
+  // Git refs can't start with - (would be interpreted as option)
+  if (ref.startsWith('-')) {
+    return false;
+  }
+  // Basic validation: refs should contain alphanumeric, /, _, -, but not control chars
+  return /^[a-zA-Z0-9\/._-]+$/.test(ref);
+}
+
 type BranchIssue = {
   type: "naming" | "stale" | "merge_conflict" | "diverged";
   severity: "error" | "warning";
@@ -84,6 +94,11 @@ async function getCommitsBehindAhead(
   baseBranch: string,
   timeoutMs: number,
 ): Promise<{ behind: number; ahead: number }> {
+  // Validate refs to prevent option injection
+  if (!isValidGitRef(currentBranch) || !isValidGitRef(baseBranch)) {
+    return { behind: 0, ahead: 0 };
+  }
+
   const result = await runCommand(
     [
       "git",
@@ -106,24 +121,46 @@ async function getCommitsBehindAhead(
   return { behind, ahead };
 }
 
-async function _checkMergeConflicts(
+async function checkMergeConflicts(
   currentBranch: string,
   baseBranch: string,
   timeoutMs: number,
 ): Promise<boolean> {
+  // Validate refs to prevent option injection
+  if (!isValidGitRef(currentBranch) || !isValidGitRef(baseBranch)) {
+    return false;
+  }
+
+  // First get the merge base
+  const mergeBaseResult = await runCommand(
+    ["git", "merge-base", "--", baseBranch, currentBranch],
+    timeoutMs,
+  );
+
+  if (mergeBaseResult.exitCode !== 0) {
+    return false; // Cannot determine merge base, assume no conflicts
+  }
+
+  const mergeBase = mergeBaseResult.stdout.trim();
+
   // Try a test merge to see if there would be conflicts
   const result = await runCommand(
     [
       "git",
       "merge-tree",
-      `$(git merge-base ${baseBranch} ${currentBranch})`,
+      "--",
+      mergeBase,
       baseBranch,
       currentBranch,
     ],
     timeoutMs,
   );
 
-  return result.stdout.includes("<<<<<<< ");
+  // Check for conflict markers and also check exit code for more reliability
+  const hasConflictMarkers = result.stdout.includes("<<<<<<< ") || 
+                             result.stdout.includes("=======") ||
+                             result.stdout.includes(">>>>>>> ");
+  return hasConflictMarkers || result.exitCode !== 0;
 }
 
 function validateBranchName(branchName: string, pattern?: RegExp): boolean {
@@ -253,16 +290,19 @@ export default tool({
         });
       }
 
-      // Check for potential merge conflicts (simplified check)
-      const hasConflicts = behind > 0; // && await checkMergeConflicts(currentBranch, baseBranch, timeoutMs)
-      if (hasConflicts && behind > maxBehind) {
-        issues.push({
-          type: "merge_conflict",
-          severity: "warning",
-          description: "Branch may have merge conflicts with base branch",
-          fix_suggestion:
-            "Merge base branch and resolve conflicts before creating PR",
-        });
+      // Check for potential merge conflicts
+      let hasConflicts = false;
+      if (behind > 0) {
+        hasConflicts = await checkMergeConflicts(currentBranch, baseBranch, timeoutMs);
+        if (hasConflicts) {
+          issues.push({
+            type: "merge_conflict",
+            severity: "error",
+            description: "Branch has merge conflicts with base branch",
+            fix_suggestion:
+              "Merge base branch and resolve conflicts before creating PR",
+          });
+        }
       }
 
       const upToDate = behind === 0;
@@ -295,7 +335,7 @@ export default tool({
         commits_behind: 0,
         issues: [],
         passed: false,
-        error: err?.message ?? "Failed to validate branch strategy",
+        error: err instanceof Error ? err.message : "Failed to validate branch strategy",
       } as BranchReport;
     }
   },

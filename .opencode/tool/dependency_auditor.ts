@@ -274,18 +274,34 @@ async function checkOutdated(timeoutMs: number): Promise<OutdatedPackage[]> {
         const current = pkg.version || "0.0.0";
         const latest = pkg.latest_version || "0.0.0";
 
-        const currentParts = current.split(".").map((p: string) =>
-          parseInt(p, 10)
-        );
-        const latestParts = latest.split(".").map((p: string) =>
-          parseInt(p, 10)
-        );
+        // Parse version numbers safely, handling edge cases
+        const parseVersion = (version: string): number[] => {
+          // Remove pre-release tags (rc, alpha, beta, etc.)
+          const cleaned = version.split(/[-+]/)[0];
+          const parts = cleaned.split(".");
+          const parsed: number[] = [];
+          
+          for (let i = 0; i < 3; i++) {
+            const part = parts[i];
+            if (part) {
+              const num = parseInt(part, 10);
+              parsed.push(isNaN(num) ? 0 : num);
+            } else {
+              parsed.push(0);
+            }
+          }
+          
+          return parsed;
+        };
+
+        const currentParts = parseVersion(current);
+        const latestParts = parseVersion(latest);
 
         let updateType: "major" | "minor" | "patch" = "patch";
 
         if (latestParts[0] > currentParts[0]) {
           updateType = "major";
-        } else if (latestParts[1] > currentParts[1]) {
+        } else if (latestParts[0] === currentParts[0] && latestParts[1] > currentParts[1]) {
           updateType = "minor";
         }
 
@@ -338,21 +354,43 @@ export default tool({
     const vulnerabilities: Vulnerability[] = [];
     const licenseIssues: LicenseIssue[] = [];
     const outdatedPackages: OutdatedPackage[] = [];
+    
+    let vulnCheckFailed = false;
+    let licCheckFailed = false;
 
     if (checkVulns) {
       const pipAuditVulns = await runPipAudit(timeoutMs);
+      const safetyVulns = await runSafety(timeoutMs);
+      
       vulnerabilities.push(...pipAuditVulns);
-
-      // Fallback to safety if pip-audit didn't work
-      if (vulnerabilities.length === 0) {
-        const safetyVulns = await runSafety(timeoutMs);
-        vulnerabilities.push(...safetyVulns);
+      vulnerabilities.push(...safetyVulns);
+      
+      // If both tools returned empty AND both appeared to execute but found nothing,
+      // we can't determine if they failed or if there are truly no vulnerabilities.
+      // Check if at least one tool is available by running a version check
+      if (pipAuditVulns.length === 0 && safetyVulns.length === 0) {
+        const pipAuditCheck = await runCommand(["pip-audit", "--version"], 5000);
+        const safetyCheck = await runCommand(["safety", "--version"], 5000);
+        
+        // Mark as failed only if BOTH tools are unavailable
+        if (pipAuditCheck.exitCode !== 0 && safetyCheck.exitCode !== 0) {
+          vulnCheckFailed = true;
+        }
       }
     }
 
     if (checkLics) {
       const licenses = await checkLicenses(timeoutMs);
       licenseIssues.push(...licenses);
+      
+      // If check was requested but returned nothing, it likely failed
+      if (licenses.length === 0) {
+        // Try to verify if pip-licenses is available
+        const testResult = await runCommand(["pip-licenses", "--help"], 5000);
+        if (testResult.exitCode !== 0) {
+          licCheckFailed = true;
+        }
+      }
     }
 
     if (checkOut) {
@@ -367,10 +405,19 @@ export default tool({
       low: vulnerabilities.filter((v) => v.severity === "low").length,
     };
 
-    const passed = counts.critical === 0 && counts.high === 0;
+    // Only pass if no critical/high vulns AND checks didn't fail
+    const passed = counts.critical === 0 && counts.high === 0 && !vulnCheckFailed;
+    
+    const warnings: string[] = [];
+    if (vulnCheckFailed) {
+      warnings.push("Vulnerability check tools (pip-audit, safety) unavailable or failed");
+    }
+    if (licCheckFailed) {
+      warnings.push("License check tool (pip-licenses) unavailable or failed");
+    }
 
     const report: AuditReport = {
-      ok: true,
+      ok: !vulnCheckFailed || vulnerabilities.length > 0, // ok=false if checks failed AND no results
       vulnerabilities,
       license_issues: licenseIssues,
       outdated_packages: outdatedPackages,
@@ -379,6 +426,7 @@ export default tool({
       total_license_issues: licenseIssues.length,
       total_outdated: outdatedPackages.length,
       passed,
+      error: warnings.length > 0 ? warnings.join("; ") : undefined,
     };
 
     return report;

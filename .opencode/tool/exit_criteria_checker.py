@@ -78,16 +78,16 @@ def evaluate(payload: Dict[str, Any]) -> Dict[str, Any]:
 
     coverage_ok = CriterionResult(
         met=(
-            branch_coverage is not None and branch_coverage > BRANCH_COVERAGE_THRESHOLD
+            branch_coverage is not None and branch_coverage >= BRANCH_COVERAGE_THRESHOLD
         ),
         value=branch_coverage,
-        threshold=f"> {BRANCH_COVERAGE_THRESHOLD}",
+        threshold=f">= {BRANCH_COVERAGE_THRESHOLD}",
         reason=(
             "branch_coverage must be provided"
             if branch_coverage is None
             else (
-                f"branch_coverage must be > {BRANCH_COVERAGE_THRESHOLD}"
-                if branch_coverage <= BRANCH_COVERAGE_THRESHOLD
+                f"branch_coverage must be >= {BRANCH_COVERAGE_THRESHOLD}"
+                if branch_coverage < BRANCH_COVERAGE_THRESHOLD
                 else "branch coverage above threshold"
             )
         ),
@@ -149,7 +149,7 @@ def evaluate(payload: Dict[str, Any]) -> Dict[str, Any]:
         "decision": decision,
         "score": score,
         "thresholds": {
-            "branch_coverage": f"> {BRANCH_COVERAGE_THRESHOLD}",
+            "branch_coverage": f">= {BRANCH_COVERAGE_THRESHOLD}",
             "tests_passed": True,
             "type_checks_passed": True,
             "critical_issues_count": 0,

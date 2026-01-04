@@ -71,7 +71,7 @@ function runCommand(
       resolve({
         exitCode: -1,
         stdout,
-        stderr: err.message,
+        stderr: err instanceof Error ? err.message : String(err),
       });
     });
   });
@@ -93,8 +93,14 @@ async function getStagedFiles(timeoutMs: number): Promise<string[]> {
     .filter((line) => line.length > 0);
 }
 
-async function getStagedDiff(timeoutMs: number): Promise<string> {
+async function getStagedDiff(timeoutMs: number, maxSizeBytes: number = 1_000_000): Promise<string> {
   const result = await runCommand(["git", "diff", "--cached"], timeoutMs);
+  
+  // Limit diff size to prevent performance issues
+  if (result.stdout.length > maxSizeBytes) {
+    return result.stdout.substring(0, maxSizeBytes);
+  }
+  
   return result.stdout;
 }
 
@@ -307,7 +313,7 @@ export default tool({
         staged_files: [],
         suggestions: [],
         recommended_commit: "",
-        error: err?.message ?? "Failed to build commit message",
+        error: err instanceof Error ? err.message : "Failed to build commit message",
       } as CommitReport;
     }
   },
