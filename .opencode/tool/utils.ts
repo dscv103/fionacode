@@ -26,6 +26,8 @@ const ALLOWED_COMMANDS = [
   'git',
   'node',
   'npm',
+  'tsc',
+  'eslint',
 ] as const;
 
 /**
