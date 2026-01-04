@@ -1,6 +1,7 @@
 import { tool } from "@opencode-ai/plugin";
 import { spawn } from "node:child_process";
 import process from "node:process";
+import { checkCommandAvailability, limitOutputSize } from "./utils";
 
 type Vulnerability = {
   package: string;
@@ -109,6 +110,13 @@ function parseSeverity(
 }
 
 async function runPipAudit(timeoutMs: number): Promise<Vulnerability[]> {
+  // Check if pip-audit is available
+  const pipAuditCheck = await checkCommandAvailability('pip-audit');
+  if (!pipAuditCheck.available) {
+    console.warn('pip-audit is not installed. Install it with: pip install pip-audit');
+    return [];
+  }
+
   const result = await runCommand(["pip-audit", "--format", "json"], timeoutMs);
 
   if (result.exitCode === -1) {
@@ -140,8 +148,8 @@ async function runPipAudit(timeoutMs: number): Promise<Vulnerability[]> {
     }
 
     return vulnerabilities;
-  } catch {
-    // pip-audit not installed or failed, return empty
+  } catch (err) {
+    console.warn('pip-audit failed:', err instanceof Error ? err.message : 'Unknown error');
     return [];
   }
 }

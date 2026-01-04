@@ -1,6 +1,9 @@
 import { tool } from "@opencode-ai/plugin";
 import { spawn } from "node:child_process";
 import process from "node:process";
+import path from "node:path";
+import fs from "node:fs";
+import { checkPythonAvailability, limitOutputSize } from "./utils";
 
 type DocstringIssue = {
   type: "missing" | "incomplete" | "mismatch" | "invalid_format";
@@ -89,121 +92,22 @@ async function validateDocstrings(
   filePath: string,
   timeoutMs: number,
 ): Promise<FunctionValidation[]> {
-  const pythonScript = `
-import ast
-import json
-import sys
-import re
+  // Check Python availability before proceeding
+  const pythonCheck = await checkPythonAvailability();
+  if (!pythonCheck.available) {
+    throw new Error(pythonCheck.error || 'Python 3 is not available');
+  }
 
-def parse_docstring_params(docstring):
-    """Extract parameter names from docstring."""
-    if not docstring:
-        return []
-    
-    # Common patterns: :param name:, Args: name, Parameters: name
-    params = []
-    
-    # Google style
-    google_match = re.findall(r'(?:Args?|Parameters?):\\s*\\n\\s+(\\w+)', docstring)
-    params.extend(google_match)
-    
-    # Sphinx/reST style
-    sphinx_match = re.findall(r':param\\s+(\\w+):', docstring)
-    params.extend(sphinx_match)
-    
-    # NumPy style
-    numpy_match = re.findall(r'^\\s*(\\w+)\\s*:', docstring, re.MULTILINE)
-    params.extend(numpy_match)
-    
-    return list(set(params))
-
-def has_return_doc(docstring):
-    """Check if docstring documents return value."""
-    if not docstring:
-        return False
-    return bool(re.search(r'(?:Returns?|Yields?):', docstring, re.IGNORECASE))
-
-def validate_file(filepath):
-    with open(filepath, 'r') as f:
-        tree = ast.parse(f.read(), filepath)
-    
-    validations = []
-    
-    for node in ast.walk(tree):
-        if isinstance(node, ast.FunctionDef):
-            docstring = ast.get_docstring(node)
-            has_docstring = docstring is not None
-            
-            actual_params = [arg.arg for arg in node.args.args if arg.arg != 'self']
-            documented_params = parse_docstring_params(docstring) if has_docstring else []
-            
-            missing_params = [p for p in actual_params if p not in documented_params]
-            extra_params = [p for p in documented_params if p not in actual_params]
-            
-            has_return_annotation = node.returns is not None
-            has_return_doc_flag = has_return_doc(docstring)
-            
-            issues = []
-            
-            if not has_docstring:
-                issues.append({
-                    'type': 'missing',
-                    'severity': 'error',
-                    'description': f'Function {node.name} has no docstring',
-                    'line': node.lineno
-                })
-            else:
-                if missing_params:
-                    issues.append({
-                        'type': 'incomplete',
-                        'severity': 'warning',
-                        'description': f'Missing documentation for parameters: {", ".join(missing_params)}',
-                        'line': node.lineno
-                    })
-                
-                if extra_params:
-                    issues.append({
-                        'type': 'mismatch',
-                        'severity': 'warning',
-                        'description': f'Documented parameters not in signature: {", ".join(extra_params)}',
-                        'line': node.lineno
-                    })
-                
-                if has_return_annotation and not has_return_doc_flag:
-                    issues.append({
-                        'type': 'incomplete',
-                        'severity': 'warning',
-                        'description': 'Function has return annotation but no return documentation',
-                        'line': node.lineno
-                    })
-            
-            valid = len(issues) == 0
-            
-            validations.append({
-                'name': node.name,
-                'line': node.lineno,
-                'has_docstring': has_docstring,
-                'param_count': len(actual_params),
-                'documented_params': documented_params,
-                'actual_params': actual_params,
-                'missing_params': missing_params,
-                'extra_params': extra_params,
-                'has_return_doc': has_return_doc_flag,
-                'has_return_annotation': has_return_annotation,
-                'issues': issues,
-                'valid': valid
-            })
-    
-    return validations
-
-if __name__ == '__main__':
-    filepath = sys.argv[1]
-    validations = validate_file(filepath)
-    print(json.dumps(validations, indent=2))
-`;
+  // Use external Python script for docstring validation
+  const scriptPath = path.join(__dirname, 'validate_docstrings.py');
+  
+  // Check if the Python script exists
+  if (!fs.existsSync(scriptPath)) {
+    throw new Error(`Docstring validation script not found: ${scriptPath}`);
+  }
 
   const result = await runCommand(
-    ["python3", "-c", pythonScript, filePath],
+    ["python3", scriptPath, filePath],
     timeoutMs,
   );
 

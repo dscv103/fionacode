@@ -1,6 +1,7 @@
 import { tool } from "@opencode-ai/plugin";
 import { spawn } from "node:child_process";
 import process from "node:process";
+import { parseConventionalCommit, limitOutputSize } from "./utils";
 
 type ConventionalCommit = {
   hash: string;
@@ -89,30 +90,17 @@ function runCommand(
   });
 }
 
-function parseConventionalCommit(line: string): ConventionalCommit | null {
-  // Format: hash|author|date|message
+function parseConventionalCommitLine(line: string): ConventionalCommit | null {
+  // Format: hash|author|date|message (but message might contain the full commit body)
   const parts = line.split("|");
   if (parts.length < 4) return null;
 
   const [hash, author, date, ...messageParts] = parts;
-  const message = messageParts.join("|");
+  const fullMessage = messageParts.join("|");
 
-  // Parse conventional commit format: type(scope)!: subject
-  const conventionalRegex = /^(\w+)(?:\(([^)]+)\))?(!)?: (.+)$/;
-  const match = message.match(conventionalRegex);
+  // Use the shared utility for proper conventional commit parsing
+  const parsed = parseConventionalCommit(fullMessage);
 
-  if (!match) {
-    return {
-      hash,
-      type: "other",
-      breaking: false,
-      subject: message,
-      author,
-      date,
-    };
-  }
-
-  const [, type, scope, breakingMarker, subject] = match;
   const validTypes = [
     "feat",
     "fix",
@@ -126,17 +114,19 @@ function parseConventionalCommit(line: string): ConventionalCommit | null {
     "chore",
     "revert",
   ];
-  const commitType = validTypes.includes(type)
-    ? (type as ConventionalCommit["type"])
+  
+  const commitType = validTypes.includes(parsed.type)
+    ? (parsed.type as ConventionalCommit["type"])
     : "other";
 
   return {
     hash,
     type: commitType,
-    scope: scope || undefined,
-    breaking: !!breakingMarker ||
-      message.toLowerCase().includes("breaking change"),
-    subject,
+    scope: parsed.scope,
+    breaking: parsed.breaking,
+    subject: parsed.description,
+    body: parsed.body,
+    footer: parsed.footer,
     author,
     date,
   };
@@ -166,7 +156,7 @@ async function getCommitsSinceTag(
   const lines = result.stdout.split("\n").filter((l) => l.trim());
 
   for (const line of lines) {
-    const commit = parseConventionalCommit(line);
+    const commit = parseConventionalCommitLine(line);
     if (commit) {
       commits.push(commit);
     }

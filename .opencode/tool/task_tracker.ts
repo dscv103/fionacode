@@ -3,6 +3,7 @@ import { randomUUID } from "crypto";
 import { mkdir, readFile, rename, writeFile } from "fs/promises";
 import path from "path";
 import process from "node:process";
+import { validateStateStructure } from "./utils";
 
 type Status = "todo" | "in_progress" | "blocked" | "done";
 
@@ -51,8 +52,20 @@ async function loadState(filePath: string): Promise<State | null> {
     const raw = await readFile(filePath, "utf8");
     const parsed = JSON.parse(raw) as State;
 
-    if (!parsed || parsed.version !== 1 || typeof parsed.tasks !== "object") {
+    // Validate state structure to prevent corrupted data issues
+    if (!validateStateStructure(parsed, ['version', 'updated_at', 'tasks'])) {
+      throw new Error("Invalid task_tracker state structure");
+    }
+
+    if (parsed.version !== 1 || typeof parsed.tasks !== "object") {
       throw new Error("Invalid task_tracker state schema");
+    }
+
+    // Additional validation: check that tasks object contains valid task nodes
+    for (const [id, task] of Object.entries(parsed.tasks)) {
+      if (!validateStateStructure(task, ['id', 'title', 'status', 'deps', 'blockers', 'artifacts', 'created_at', 'updated_at'])) {
+        throw new Error(`Invalid task node structure for task ${id}`);
+      }
     }
 
     return parsed;

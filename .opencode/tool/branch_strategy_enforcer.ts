@@ -1,6 +1,7 @@
 import { tool } from "@opencode-ai/plugin";
 import { spawn } from "node:child_process";
 import process from "node:process";
+import { limitOutputSize } from "./utils";
 
 // Validate git ref/branch to prevent option injection
 function isValidGitRef(ref: string): boolean {
@@ -10,6 +11,36 @@ function isValidGitRef(ref: string): boolean {
   }
   // Basic validation: refs should contain alphanumeric, /, _, -, but not control chars
   return /^[a-zA-Z0-9\/._-]+$/.test(ref);
+}
+
+/**
+ * Validate branch naming according to common conventions:
+ * 
+ * Recommended patterns:
+ * - feature/description - For new features
+ * - bugfix/description or fix/description - For bug fixes  
+ * - hotfix/description - For urgent production fixes
+ * - release/version - For release branches
+ * - chore/description - For maintenance tasks
+ * - docs/description - For documentation updates
+ * 
+ * General rules:
+ * - Use lowercase with hyphens for word separation
+ * - Avoid special characters except / and -
+ * - Keep branch names concise but descriptive
+ * - Include ticket/issue numbers if applicable (e.g., feature/PROJ-123-add-login)
+ * 
+ * @param branchName - The branch name to validate
+ * @param pattern - Optional custom regex pattern (default: standard git-flow pattern)
+ * @returns True if valid, false otherwise
+ */
+function validateBranchNaming(branchName: string, pattern?: string): boolean {
+  // Default pattern follows git-flow and common conventions
+  // Allows: feature/*, bugfix/*, hotfix/*, release/*, chore/*, docs/*, or main/master/develop
+  const defaultPattern = /^(feature|bugfix|fix|hotfix|release|chore|docs)\/[a-z0-9-]+$|^(main|master|develop)$/;
+  
+  const regex = pattern ? new RegExp(pattern) : defaultPattern;
+  return regex.test(branchName);
 }
 
 type BranchIssue = {
@@ -163,14 +194,12 @@ async function checkMergeConflicts(
   return hasConflictMarkers || result.exitCode !== 0;
 }
 
+// This function is kept for backward compatibility but uses the documented function above
 function validateBranchName(branchName: string, pattern?: RegExp): boolean {
-  // Default pattern: feature/*, fix/*, hotfix/*, release/*, chore/*, docs/*
-  const defaultPattern =
-    /^(feature|fix|hotfix|release|chore|docs|refactor|test)\/[a-z0-9-]+$/;
-
-  const patternToUse = pattern || defaultPattern;
-
-  return patternToUse.test(branchName);
+  if (pattern) {
+    return pattern.test(branchName);
+  }
+  return validateBranchNaming(branchName);
 }
 
 export default tool({

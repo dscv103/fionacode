@@ -1,6 +1,7 @@
 import { tool } from "@opencode-ai/plugin";
 import { spawn } from "node:child_process";
 import process from "node:process";
+import { checkCommandAvailability, limitOutputSize } from "./utils";
 
 type FunctionComplexity = {
   name: string;
@@ -90,6 +91,15 @@ async function analyzeWithRadon(
   paths: string[],
   timeoutMs: number,
 ): Promise<FileComplexity[]> {
+  // Check if radon is available before attempting to use it
+  const radonCheck = await checkCommandAvailability('radon');
+  if (!radonCheck.available) {
+    throw new Error(
+      radonCheck.error || 
+      'radon is not installed. Install it with: pip install radon'
+    );
+  }
+
   const args = ["cc", "--json", ...paths];
   const result = await runCommand(["radon", ...args], timeoutMs);
 

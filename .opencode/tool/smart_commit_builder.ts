@@ -1,6 +1,7 @@
 import { tool } from "@opencode-ai/plugin";
 import { spawn } from "node:child_process";
 import process from "node:process";
+import { limitOutputSize } from "./utils";
 
 type CommitSuggestion = {
   type:
@@ -96,12 +97,14 @@ async function getStagedFiles(timeoutMs: number): Promise<string[]> {
 async function getStagedDiff(timeoutMs: number, maxSizeBytes: number = 1_000_000): Promise<string> {
   const result = await runCommand(["git", "diff", "--cached"], timeoutMs);
   
-  // Limit diff size to prevent performance issues
-  if (result.stdout.length > maxSizeBytes) {
-    return result.stdout.substring(0, maxSizeBytes);
+  // Limit diff size to prevent performance issues using utility function
+  const { output, truncated } = limitOutputSize(result.stdout, maxSizeBytes);
+  
+  if (truncated) {
+    console.warn(`Diff output was truncated from ${result.stdout.length} to ${maxSizeBytes} bytes`);
   }
   
-  return result.stdout;
+  return output;
 }
 
 function analyzeChanges(

@@ -3,6 +3,7 @@ import { spawn } from "node:child_process";
 import process from "node:process";
 import path from "node:path";
 import fs from "node:fs";
+import { checkPythonAvailability, limitOutputSize } from "./utils";
 
 // Validate git ref/branch to prevent option injection
 function isValidGitRef(ref: string): boolean {
@@ -116,6 +117,12 @@ async function extractAPIFromRef(
     throw new Error(`Invalid git reference: ${ref}`);
   }
 
+  // Check Python availability before proceeding
+  const pythonCheck = await checkPythonAvailability();
+  if (!pythonCheck.available) {
+    throw new Error(pythonCheck.error || 'Python 3 is not available');
+  }
+
   // Use git show to read file content without checking out
   // Use -- separator to prevent ref from being interpreted as option
   const gitShowResult = await runCommand(
@@ -129,79 +136,16 @@ async function extractAPIFromRef(
 
   const fileContent = gitShowResult.stdout;
 
-  const pythonScript = `
-import ast
-import json
-import sys
-
-def extract_public_api(content, filepath):
-    """Extract all public API symbols from Python content."""
-    try:
-        tree = ast.parse(content, filepath)
-    except:
-        return []
-    
-    symbols = []
-    module_name = filepath.replace('.py', '').replace('/', '.')
-    
-    # Check for __all__ definition
-    all_exports = None
-    for node in ast.walk(tree):
-        if isinstance(node, ast.Assign):
-            for target in node.targets:
-                if isinstance(target, ast.Name) and target.id == '__all__':
-                    if isinstance(node.value, (ast.List, ast.Tuple)):
-                        # Handle both ast.Str (Python < 3.8) and ast.Constant (Python >= 3.8)
-                        all_exports = []
-                        for elt in node.value.elts:
-                            if isinstance(elt, ast.Str):
-                                all_exports.append(elt.s)
-                            elif isinstance(elt, ast.Constant) and isinstance(elt.value, str):
-                                all_exports.append(elt.value)
-    
-    for node in tree.body:
-        name = None
-        symbol_type = None
-        signature = None
-        
-        if isinstance(node, ast.ClassDef):
-            name = node.name
-            symbol_type = 'class'
-            signature = f'class {name}'
-        elif isinstance(node, ast.FunctionDef):
-            name = node.name
-            symbol_type = 'function'
-            args = [arg.arg for arg in node.args.args]
-            signature = f'def {name}({", ".join(args)})'
-        elif isinstance(node, ast.Assign):
-            for target in node.targets:
-                if isinstance(target, ast.Name):
-                    name = target.id
-                    # Distinguish constants (UPPER_CASE) from variables
-                    symbol_type = 'constant' if name.isupper() else 'variable'
-        
-        # Only include public symbols (not starting with _) or those in __all__
-        if name and not name.startswith('_'):
-            if all_exports is None or name in all_exports:
-                symbols.append({
-                    'name': name,
-                    'type': symbol_type,
-                    'signature': signature,
-                    'module': module_name,
-                    'line': node.lineno
-                })
-    
-    return symbols
-
-if __name__ == '__main__':
-    content = sys.stdin.read()
-    filepath = sys.argv[1]
-    symbols = extract_public_api(content, filepath)
-    print(json.dumps(symbols, indent=2))
-`;
+  // Use external Python script for API extraction
+  const scriptPath = path.join(__dirname, 'extract_api.py');
+  
+  // Check if the Python script exists
+  if (!fs.existsSync(scriptPath)) {
+    throw new Error(`API extraction script not found: ${scriptPath}`);
+  }
 
   // Pass file content via stdin to Python script
-  const proc = spawn("python3", ["-c", pythonScript, filePath], {
+  const proc = spawn("python3", [scriptPath, filePath], {
     shell: false,
     cwd: process.cwd(),
   });
@@ -327,7 +271,9 @@ function generateDiffReport(
     lines.push(``);
   }
 
-  return lines.join("\n");
+  const report = lines.join("\n");
+  const { output } = limitOutputSize(report);
+  return output;
 }
 
 export default tool({

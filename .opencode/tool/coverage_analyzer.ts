@@ -3,6 +3,7 @@ import { spawn } from "node:child_process";
 import { readFile } from "node:fs/promises";
 import path from "node:path";
 import process from "node:process";
+import { checkCommandAvailability, checkPythonPackage, limitOutputSize } from "./utils";
 
 type Severity = "critical" | "warning" | "info";
 
@@ -47,10 +48,27 @@ function classifySeverity(
   return "info";
 }
 
-function runPytest(
+async function runPytest(
   pytestArgs: string[],
   timeoutMs: number,
 ): Promise<{ exitCode: number; stdout: string; stderr: string }> {
+  // Check if pytest and coverage are available
+  const pytestCheck = await checkCommandAvailability('pytest');
+  if (!pytestCheck.available) {
+    throw new Error(
+      pytestCheck.error || 
+      'pytest is not installed. Install it with: pip install pytest pytest-cov'
+    );
+  }
+
+  const coverageCheck = await checkPythonPackage('coverage');
+  if (!coverageCheck.installed) {
+    throw new Error(
+      coverageCheck.error || 
+      'coverage is not installed. Install it with: pip install coverage'
+    );
+  }
+
   return new Promise((resolve) => {
     const proc = spawn("pytest", pytestArgs, {
       shell: false,

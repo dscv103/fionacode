@@ -1,10 +1,20 @@
 import { tool } from "@opencode-ai/plugin"
 import { spawn } from "node:child_process"
 import process from "node:process"
+import path from "node:path"
+import fs from "node:fs"
 
 function runPython(jsonPayload, timeoutMs = 30000) {
   return new Promise((resolve, reject) => {
-    const proc = spawn("python3", [".opencode/tool/exit_criteria_checker.py"], {
+    // Validate Python script exists before attempting to run it
+    const scriptPath = path.join(process.cwd(), ".opencode/tool/exit_criteria_checker.py")
+    
+    if (!fs.existsSync(scriptPath)) {
+      reject(new Error(`Python script not found: ${scriptPath}`))
+      return
+    }
+
+    const proc = spawn("python3", [scriptPath], {
       stdio: ["pipe", "pipe", "pipe"],
       cwd: process.cwd(), // Explicit cwd
     })
