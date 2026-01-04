@@ -111,7 +111,7 @@ This project uses a multi-agent system with:
 ## Markdown Linting
 
 - Follow markdownlint rules defined in `.markdownlint.json`
-- Note: MD001, MD013, MD024, MD033, MD040, MD041, MD046, MD059 are disabled
+- Note: The following markdownlint rules are disabled: MD001, MD013, MD024, MD033, MD040, MD041, MD046, MD059
 
 ## Development Workflow
 
