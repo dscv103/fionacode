@@ -3,15 +3,116 @@
  */
 
 import { spawn } from 'child_process';
-import { promisify } from 'util';
-import { exec } from 'child_process';
-
-const execAsync = promisify(exec);
 
 /**
  * Maximum output size in bytes (10MB default)
  */
 export const MAX_OUTPUT_SIZE = 10 * 1024 * 1024;
+
+/**
+ * Allowlist of known safe commands that tools may check for
+ * This list can be extended as needed for new tools
+ */
+const ALLOWED_COMMANDS = [
+  'python3',
+  'pytest',
+  'radon',
+  'pip-audit',
+  'mypy',
+  'pyright',
+  'coverage',
+  'which',
+  'pip',
+  'git',
+  'node',
+  'npm',
+] as const;
+
+/**
+ * Validates a command name against security rules
+ * @param command - Command name to validate
+ * @returns True if valid, false otherwise
+ */
+function isValidCommandName(command: string): boolean {
+  // Must be alphanumeric with hyphens, underscores, or dots
+  // No path separators, no special shell characters
+  const validPattern = /^[a-zA-Z0-9_.-]+$/;
+  
+  if (!validPattern.test(command)) {
+    return false;
+  }
+  
+  // Check against allowlist
+  return ALLOWED_COMMANDS.includes(command as any);
+}
+
+/**
+ * Validates a Python package name against Python identifier rules
+ * Allows dots for module paths (e.g., 'package.submodule')
+ * @param packageName - Package name to validate
+ * @returns True if valid, false otherwise
+ */
+function isValidPythonPackageName(packageName: string): boolean {
+  // Python identifier rules: ^[a-zA-Z_][a-zA-Z0-9_]*(\.[a-zA-Z_][a-zA-Z0-9_]*)*$
+  const validPattern = /^[a-zA-Z_][a-zA-Z0-9_]*(\.[a-zA-Z_][a-zA-Z0-9_]*)*$/;
+  return validPattern.test(packageName);
+}
+
+/**
+ * Shared command runner with security controls
+ * Executes commands without shell interpolation
+ * @param command - Command to run (first element of args array)
+ * @param args - Arguments for the command
+ * @param timeoutMs - Timeout in milliseconds (default: 5000)
+ * @returns Promise with exit code, stdout, and stderr
+ */
+export function runCommand(
+  command: string,
+  args: string[],
+  timeoutMs: number = 5000
+): Promise<{ exitCode: number; stdout: string; stderr: string }> {
+  return new Promise((resolve) => {
+    const proc = spawn(command, args, {
+      shell: false,
+      timeout: timeoutMs,
+    });
+
+    let stdout = '';
+    let stderr = '';
+    let timedOut = false;
+
+    const timer = setTimeout(() => {
+      timedOut = true;
+      proc.kill('SIGKILL');
+    }, timeoutMs);
+
+    proc.stdout?.on('data', (chunk) => {
+      stdout += chunk.toString('utf8');
+    });
+
+    proc.stderr?.on('data', (chunk) => {
+      stderr += chunk.toString('utf8');
+    });
+
+    proc.on('close', (code) => {
+      clearTimeout(timer);
+      resolve({
+        exitCode: timedOut ? -1 : code ?? -1,
+        stdout,
+        stderr: timedOut ? 'Command timed out' : stderr,
+      });
+    });
+
+    proc.on('error', (err) => {
+      clearTimeout(timer);
+      resolve({
+        exitCode: -1,
+        stdout,
+        stderr: err.message,
+      });
+    });
+  });
+}
 
 /**
  * Check if Python 3 is available
@@ -23,11 +124,15 @@ export async function checkPythonAvailability(): Promise<{
   error?: string;
 }> {
   try {
-    const { stdout } = await execAsync('python3 --version', {
-      timeout: 5000,
-    });
-    const version = stdout.trim();
-    return { available: true, version };
+    const result = await runCommand('python3', ['--version'], 5000);
+    if (result.exitCode === 0) {
+      const version = result.stdout.trim() || result.stderr.trim();
+      return { available: true, version };
+    }
+    return {
+      available: false,
+      error: 'Python 3 is not available. Please install Python 3.8 or higher.',
+    };
   } catch (error) {
     return {
       available: false,
@@ -48,12 +153,26 @@ export async function checkPythonPackage(
   version?: string;
   error?: string;
 }> {
+  // Validate package name to prevent injection attacks
+  if (!isValidPythonPackageName(packageName)) {
+    return {
+      installed: false,
+      error: `Invalid Python package name: '${packageName}'. Package names must follow Python identifier rules.`,
+    };
+  }
+
   try {
-    const { stdout } = await execAsync(
-      `python3 -c "import ${packageName}; print(${packageName}.__version__ if hasattr(${packageName}, '__version__') else 'installed')"`,
-      { timeout: 5000 }
-    );
-    return { installed: true, version: stdout.trim() };
+    // Use explicit arguments instead of shell interpolation
+    const pythonCode = `import ${packageName}; print(${packageName}.__version__ if hasattr(${packageName}, '__version__') else 'installed')`;
+    const result = await runCommand('python3', ['-c', pythonCode], 5000);
+    
+    if (result.exitCode === 0) {
+      return { installed: true, version: result.stdout.trim() };
+    }
+    return {
+      installed: false,
+      error: `Python package '${packageName}' is not installed. Install it with: pip install ${packageName}`,
+    };
   } catch (error) {
     return {
       installed: false,
@@ -74,18 +193,24 @@ export async function checkCommandAvailability(
   version?: string;
   error?: string;
 }> {
+  // Validate command name to prevent injection attacks
+  if (!isValidCommandName(command)) {
+    return {
+      available: false,
+      error: `Invalid or disallowed command name: '${command}'. Command must be alphanumeric with hyphens/underscores/dots and be in the allowlist.`,
+    };
+  }
+
   try {
-    const { stdout } = await execAsync(`which ${command}`, {
-      timeout: 5000,
-    });
-    if (stdout.trim()) {
+    // Use 'which' command with explicit arguments (no shell interpolation)
+    const whichResult = await runCommand('which', [command], 5000);
+    
+    if (whichResult.exitCode === 0 && whichResult.stdout.trim()) {
       // Try to get version
       try {
-        const { stdout: versionOutput } = await execAsync(
-          `${command} --version`,
-          { timeout: 5000 }
-        );
-        return { available: true, version: versionOutput.trim() };
+        const versionResult = await runCommand(command, ['--version'], 5000);
+        const versionOutput = versionResult.stdout.trim() || versionResult.stderr.trim();
+        return { available: true, version: versionOutput };
       } catch {
         return { available: true };
       }
