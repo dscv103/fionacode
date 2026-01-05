@@ -1,4 +1,5 @@
 {
+  "$schema": "https://opencode.ai/config.json",
   "agent": {
     "orchestrator": {
       "description": "Primary coordinator: decomposes the user request into subtasks + file list, delegates to subagents, manages iteration until exit criteria are met.",
@@ -17,17 +18,10 @@
         "branch_strategy_enforcer": true,
         "agent_handoff_validator": true
       },
-      "permissions": {
+      "permission": {
         "edit": "ask",
         "bash": "ask",
         "webfetch": "ask"
-      },
-      "mcp": {
-        "github": true,
-        "context7": true,
-        "motherduck": true,
-        "filesystem": true,
-        "code-reasoning": true
       }
     },
     "implementer": {
@@ -46,17 +40,10 @@
         "test_runner_smart": true,
         "fixture_generator": true
       },
-      "permissions": {
+      "permission": {
         "edit": "allow",
         "bash": "allow",
         "webfetch": "deny"
-      },
-      "mcp": {
-        "github": true,
-        "context7": true,
-        "motherduck": true,
-        "filesystem": true,
-        "code-reasoning": true
       }
     },
     "code-review": {
@@ -77,17 +64,10 @@
         "docstring_validator": true,
         "api_diff_reporter": true
       },
-      "permissions": {
+      "permission": {
         "edit": "deny",
         "bash": "allow",
         "webfetch": "deny"
-      },
-      "mcp": {
-        "github": true,
-        "context7": true,
-        "motherduck": true,
-        "filesystem": true,
-        "code-reasoning": true
       }
     },
     "planning": {
@@ -104,17 +84,10 @@
         "webfetch": true,
         "task_tracker": true
       },
-      "permissions": {
+      "permission": {
         "edit": "deny",
         "bash": "ask",
         "webfetch": "ask"
-      },
-      "mcp": {
-        "github": true,
-        "context7": true,
-        "motherduck": true,
-        "filesystem": true,
-        "code-reasoning": true
       }
     },
     "web-research": {
@@ -131,17 +104,10 @@
         "webfetch": true,
         "github_*": true
       },
-      "permissions": {
+      "permission": {
         "edit": "deny",
         "bash": "deny",
         "webfetch": "allow"
-      },
-      "mcp": {
-        "github": true,
-        "context7": true,
-        "motherduck": false,
-        "filesystem": false,
-        "code-reasoning": true
       }
     },
     "file-navigator": {
@@ -156,17 +122,10 @@
         "search": true,
         "list": true
       },
-      "permissions": {
+      "permission": {
         "edit": "deny",
         "bash": "deny",
         "webfetch": "deny"
-      },
-      "mcp": {
-        "github": false,
-        "context7": false,
-        "motherduck": true,
-        "filesystem": true,
-        "code-reasoning": false
       }
     },
     "executor": {
@@ -183,17 +142,10 @@
         "list": true,
         "flakiness_detector": true
       },
-      "permissions": {
+      "permission": {
         "edit": "deny",
         "bash": "allow",
         "webfetch": "deny"
-      },
-      "mcp": {
-        "github": false,
-        "context7": false,
-        "motherduck": true,
-        "filesystem": true,
-        "code-reasoning": false
       }
     },
     "security-review": {
@@ -210,17 +162,10 @@
         "webfetch": true,
         "dependency_auditor": true
       },
-      "permissions": {
+      "permission": {
         "edit": "deny",
         "bash": "ask",
         "webfetch": "ask"
-      },
-      "mcp": {
-        "github": true,
-        "context7": true,
-        "motherduck": true,
-        "filesystem": true,
-        "code-reasoning": true
       }
     },
     "docs": {
@@ -237,17 +182,10 @@
         "webfetch": false,
         "docstring_validator": true
       },
-      "permissions": {
+      "permission": {
         "edit": "allow",
         "bash": "deny",
         "webfetch": "deny"
-      },
-      "mcp": {
-        "github": true,
-        "context7": true,
-        "motherduck": true,
-        "filesystem": true,
-        "code-reasoning": false
       }
     },
     "compliance": {
@@ -264,17 +202,10 @@
         "webfetch": false,
         "dependency_auditor": true
       },
-      "permissions": {
+      "permission": {
         "edit": "deny",
         "bash": "deny",
         "webfetch": "deny"
-      },
-      "mcp": {
-        "github": true,
-        "context7": true,
-        "motherduck": true,
-        "filesystem": true,
-        "code-reasoning": true
       }
     },
     "diagnostics": {
@@ -293,17 +224,10 @@
         "list": true,
         "flakiness_detector": true
       },
-      "permissions": {
+      "permission": {
         "edit": "deny",
         "bash": "allow",
         "webfetch": "deny"
-      },
-      "mcp": {
-        "github": true,
-        "context7": true,
-        "motherduck": true,
-        "filesystem": true,
-        "code-reasoning": true
       }
     },
     "refactoring": {
@@ -319,17 +243,10 @@
         "list": true,
         "code_complexity_scorer": true
       },
-      "permissions": {
+      "permission": {
         "edit": "ask",
         "bash": "ask",
         "webfetch": "deny"
-      },
-      "mcp": {
-        "github": true,
-        "context7": true,
-        "motherduck": true,
-        "filesystem": true,
-        "code-reasoning": true
       }
     },
     "integration": {
@@ -350,17 +267,10 @@
         "smart_commit_builder": true,
         "branch_strategy_enforcer": true
       },
-      "permissions": {
+      "permission": {
         "edit": "ask",
         "bash": "ask",
         "webfetch": "ask"
-      },
-      "mcp": {
-        "github": true,
-        "context7": true,
-        "motherduck": true,
-        "filesystem": true,
-        "code-reasoning": true
       }
     },
     "communication": {
@@ -380,17 +290,10 @@
         "api_diff_reporter": true,
         "smart_commit_builder": true
       },
-      "permissions": {
+      "permission": {
         "edit": "allow",
         "bash": "deny",
         "webfetch": "deny"
-      },
-      "mcp": {
-        "github": true,
-        "context7": false,
-        "motherduck": false,
-        "filesystem": true,
-        "code-reasoning": false
       }
     }
   },
