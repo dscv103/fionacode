@@ -7,7 +7,7 @@ before:
 
 builds:
   - id: fifi
-    main: ./cmd/fifi
+    main: ./cmd/fifi/
     binary: fifi
     env:
       - CGO_ENABLED=0
@@ -68,7 +68,7 @@ brews:
       owner: dscv103
       name: homebrew-fifi
       branch: main
-    folder: Formula
+    directory: Formula
     homepage: https://github.com/dscv103/fionacode
     description: "FionaCode CLI - Initialize OpenCode AI projects"
     license: MIT
