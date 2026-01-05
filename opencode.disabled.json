@@ -1,6 +1,4 @@
 {
-  "description": "Configuration to disable all tools and MCP servers globally. Individual agents can override by setting specific tools to true in their agent config.",
-  
   "tools": {
     "read": false,
     "edit": false,
@@ -25,7 +23,6 @@
     "flakiness_detector": false,
     "github_*": false
   },
-  
   "mcp": {
     "github": {
       "type": "remote",
@@ -38,49 +35,47 @@
     },
     "context7": {
       "type": "remote",
-      "url": "https://context7.modelcontextprotocol.io/v1",
+      "url": "https://mcp.context7.com/mcp",
       "oauth": false,
       "enabled": false,
       "headers": {
         "Authorization": "Bearer {env:CONTEXT7_API_KEY}"
       }
     },
-    "filesystem": {
-      "type": "local",
-      "command": ["npx", "-y", "@modelcontextprotocol/server-filesystem", "."],
-      "enabled": false,
-      "timeout": 5000
-    },
-    "sqlite": {
+    "motherduck": {
       "type": "local",
       "command": [
         "npx",
         "-y",
-        "@modelcontextprotocol/server-sqlite",
-        "--db-path",
-        ".opencode/state/metadata.db"
+        "@motherduckdb/mcp-server-motherduck"
+      ],
+      "enabled": false,
+      "timeout": 10000,
+      "environment": {
+        "MOTHERDUCK_TOKEN": "{env:MOTHERDUCK_TOKEN}"
+      },
+      "note": "Query and analyze data with MotherDuck and local DuckDB. For cloud features, set MOTHERDUCK_TOKEN environment variable. Works locally without token for file-based DuckDB."
+    },
+    "filesystem": {
+      "type": "local",
+      "command": [
+        "npx",
+        "-y",
+        "@modelcontextprotocol/server-filesystem",
+        "."
       ],
       "enabled": false,
       "timeout": 5000
-    }
-  },
-  
-  "agents": {
-    "_comment": "Example: To enable specific tools for an agent, override in the agent's tools section",
-    "_example": {
-      "description": "Example agent with selective tool access",
-      "mode": "subagent",
-      "temperature": 0.2,
-      "prompt": ".opencode/prompts/example.txt",
-      "tools": {
-        "read": true,
-        "search": true,
-        "coverage_analyzer": true
-      },
-      "permissions": {
-        "edit": "deny",
-        "bash": "deny",
-        "webfetch": "deny"
+    },
+    "code-reasoning": {
+      "type": "local",
+      "command": [
+        "node",
+        "/home/dscv/Repositories/mcp-sequentialthinking-tools/dist/index.js"
+      ],
+      "enabled": false,
+      "environment": {
+        "MAX_HISTORY_SIZE": "1000"
       }
     }
   }

@@ -7,6 +7,40 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.1.2] - 2026-01-04
+
+### Added
+- Git pre-commit hook for automatic opencode.json sync between repo root and CLI embedded assets
+- Makefile `sync-config` target for manual configuration synchronization
+- CONFIG_SYNC.md documentation explaining sync mechanisms and troubleshooting
+- MCP server permissions configuration for all 14 agents with role-based access control
+- MotherDuck MCP server integration replacing SQLite and PostgreSQL
+
+### Changed
+- Updated Context7 MCP server URL from `context7.modelcontextprotocol.io/v1` to `mcp.context7.com/mcp`
+- Enhanced build process to automatically sync configuration before compilation
+- Improved agent MCP permissions with granular access control:
+  - Full access (all 5 MCP servers): orchestrator, implementer, code-review, planning, security-review, compliance, diagnostics, refactoring, integration
+  - Limited access: web-research (github + context7 + code-reasoning), file-navigator (filesystem + motherduck), executor (filesystem + motherduck), docs (github + context7 + motherduck + filesystem), communication (github + filesystem)
+
+### Removed
+- SQLite MCP server (archived package, replaced by MotherDuck)
+- PostgreSQL MCP server (redundant with MotherDuck capabilities)
+
+### Fixed
+- MCP server configurations now properly synchronized between development and CLI distribution
+
+## [0.1.1] - 2026-01-04
+
+### Fixed
+- Corrected JSON structure from "agents" to "agent" in opencode.json configuration
+- Updated validation code to properly recognize "agent" field instead of "agents"
+- Fixed embedded template to use correct "agent" key
+
+## [0.1.0] - 2026-01-04
+
+Initial release of fifi CLI tool.
+
 ### Added
 - Initial implementation of fifi CLI tool
 - `init` command to initialize FionaCode projects
@@ -17,27 +51,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Automated release workflow via GitHub Actions
 - Comprehensive documentation
 
-### Changed
-- N/A (initial release)
-
-### Deprecated
-- N/A (initial release)
-
-### Removed
-- N/A (initial release)
-
-### Fixed
-- Corrected JSON structure from "agents" to "agent" in opencode.json configuration
-- Updated validation code to properly recognize "agent" field instead of "agents"
-- Fixed embedded template to use correct "agent" key
-
-### Security
-- N/A (initial release)
-
-## [0.1.0] - TBD
-
-Initial release of fifi CLI tool.
-
 ### Features
 - Initialize new FionaCode projects with `fifi init`
 - Validate existing configurations with `fifi validate`
@@ -46,5 +59,7 @@ Initial release of fifi CLI tool.
 - Installation script for automated setup
 - Version information with build date
 
-[Unreleased]: https://github.com/dscv103/fionacode/compare/v0.1.0...HEAD
+[Unreleased]: https://github.com/dscv103/fionacode/compare/v0.1.2...HEAD
+[0.1.2]: https://github.com/dscv103/fionacode/compare/v0.1.1...v0.1.2
+[0.1.1]: https://github.com/dscv103/fionacode/compare/v0.1.0...v0.1.1
 [0.1.0]: https://github.com/dscv103/fionacode/releases/tag/v0.1.0

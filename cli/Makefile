@@ -9,10 +9,16 @@ LDFLAGS=-ldflags "-s -w -X main.Version=$(VERSION) -X main.BuildDate=$(BUILD_DAT
 all: build
 
 ## build: Build the binary
-build:
+build: sync-config
 	@echo "Building $(BINARY_NAME)..."
 	go build $(LDFLAGS) -o $(BINARY_NAME) ./cmd/fifi
 	@echo "Build complete: ./$(BINARY_NAME)"
+
+## sync-config: Sync opencode.json from repo root to embedded assets
+sync-config:
+	@echo "Syncing opencode.json from repo root..."
+	@cp ../opencode.json internal/assets/embedded/opencode.json
+	@echo "Config synced"
 
 ## build-all: Build for all platforms
 build-all:
