@@ -4,6 +4,7 @@ import (
 	"archive/tar"
 	"archive/zip"
 	"compress/gzip"
+	"encoding/json"
 	"fmt"
 	"io"
 	"net/http"
@@ -17,7 +18,6 @@ import (
 
 const (
 	githubReleasesAPI = "https://api.github.com/repos/dscv103/fionacode/releases/latest"
-	githubReleaseBase = "https://github.com/dscv103/fionacode/releases/download"
 )
 
 var updateCmd = &cobra.Command{
@@ -30,13 +30,13 @@ the current binary. Requires write access to the fifi installation directory.`,
 	RunE: func(cmd *cobra.Command, args []string) error {
 		fmt.Println("Checking for updates...")
 
-		latestVersion, err := getLatestVersion()
+		latestRelease, err := getLatestRelease()
 		if err != nil {
 			return fmt.Errorf("failed to check for updates: %w", err)
 		}
 
+		latestVersion := strings.TrimPrefix(latestRelease.TagName, "v")
 		currentVersion := strings.TrimPrefix(Version, "v")
-		latestVersion = strings.TrimPrefix(latestVersion, "v")
 
 		if currentVersion == latestVersion {
 			fmt.Printf("✓ You're already on the latest version (v%s)\n", currentVersion)
@@ -47,7 +47,12 @@ the current binary. Requires write access to the fifi installation directory.`,
 		fmt.Printf("Latest version:  v%s\n", latestVersion)
 		fmt.Println("\nDownloading update...")
 
-		if err := downloadAndInstall(latestVersion); err != nil {
+		asset, err := findAssetForPlatform(latestRelease, latestVersion)
+		if err != nil {
+			return fmt.Errorf("update failed: %w", err)
+		}
+
+		if err := downloadAndInstall(asset); err != nil {
 			return fmt.Errorf("update failed: %w", err)
 		}
 
@@ -60,47 +65,116 @@ func init() {
 	rootCmd.AddCommand(updateCmd)
 }
 
-// getLatestVersion fetches the latest release version from GitHub API
-func getLatestVersion() (string, error) {
+type releaseAsset struct {
+	Name               string `json:"name"`
+	BrowserDownloadURL string `json:"browser_download_url"`
+}
+
+type releaseInfo struct {
+	TagName string         `json:"tag_name"`
+	Assets  []releaseAsset `json:"assets"`
+}
+
+// getLatestRelease fetches the latest release metadata (tag + assets) from GitHub API
+func getLatestRelease() (*releaseInfo, error) {
 	resp, err := http.Get(githubReleasesAPI)
 	if err != nil {
-		return "", err
+		return nil, err
 	}
 	defer resp.Body.Close()
 
 	if resp.StatusCode != http.StatusOK {
-		return "", fmt.Errorf("GitHub API returned status %d", resp.StatusCode)
+		return nil, fmt.Errorf("GitHub API returned status %d", resp.StatusCode)
 	}
 
-	body, err := io.ReadAll(resp.Body)
+	var release releaseInfo
+	if err := json.NewDecoder(resp.Body).Decode(&release); err != nil {
+		return nil, err
+	}
+
+	if release.TagName == "" {
+		return nil, fmt.Errorf("could not find tag_name in response")
+	}
+
+	return &release, nil
+}
+
+// getLatestVersion is kept for lightweight version checks elsewhere
+func getLatestVersion() (string, error) {
+	release, err := getLatestRelease()
 	if err != nil {
 		return "", err
 	}
+	return release.TagName, nil
+}
 
-	// Simple JSON parsing to extract tag_name
-	// This is a simple approach to avoid adding a JSON library dependency
-	bodyStr := string(body)
-	tagIndex := strings.Index(bodyStr, `"tag_name"`)
-	if tagIndex == -1 {
-		return "", fmt.Errorf("could not find tag_name in response")
+// findAssetForPlatform selects the correct release asset for the current OS/arch.
+// Falls back to legacy naming (e.g., fifi_Linux_x86_64) for older releases.
+func findAssetForPlatform(release *releaseInfo, version string) (*releaseAsset, error) {
+	osSlug := runtime.GOOS
+	archSlug := runtime.GOARCH
+
+	switch osSlug {
+	case "darwin":
+		osSlug = "macOS"
+	case "linux":
+		osSlug = "linux"
+	case "windows":
+		osSlug = "windows"
 	}
 
-	// Find the value after "tag_name":"
-	startIndex := strings.Index(bodyStr[tagIndex:], `":"`) + tagIndex + 3
-	endIndex := strings.Index(bodyStr[startIndex:], `"`) + startIndex
-
-	if startIndex < 0 || endIndex < 0 {
-		return "", fmt.Errorf("could not parse tag_name from response")
+	legacyOS := strings.ToUpper(osSlug[:1]) + osSlug[1:]
+	legacyArch := archSlug
+	if archSlug == "amd64" {
+		legacyArch = "x86_64"
 	}
 
-	return bodyStr[startIndex:endIndex], nil
+	candidates := []string{
+		fmt.Sprintf("fifi_%s_%s_%s.tar.gz", version, osSlug, archSlug),
+		fmt.Sprintf("fifi_%s_%s_%s.zip", version, osSlug, archSlug),
+		fmt.Sprintf("fifi_%s_%s_%s.tar.gz", "v"+version, osSlug, archSlug),
+		fmt.Sprintf("fifi_%s_%s_%s.zip", "v"+version, osSlug, archSlug),
+		fmt.Sprintf("fifi_%s_%s", legacyOS, legacyArch),
+		fmt.Sprintf("fifi_%s_%s.tar.gz", legacyOS, legacyArch),
+		fmt.Sprintf("fifi_%s_%s.zip", legacyOS, legacyArch),
+	}
+
+	for _, candidate := range candidates {
+		for i := range release.Assets {
+			if strings.EqualFold(release.Assets[i].Name, candidate) {
+				return &release.Assets[i], nil
+			}
+		}
+	}
+
+	for i := range release.Assets {
+		name := strings.ToLower(release.Assets[i].Name)
+		if strings.Contains(name, strings.ToLower(osSlug)) &&
+			(strings.Contains(name, strings.ToLower(archSlug)) || strings.Contains(name, strings.ToLower(legacyArch))) {
+			return &release.Assets[i], nil
+		}
+	}
+
+	names := make([]string, 0, len(release.Assets))
+	for _, a := range release.Assets {
+		names = append(names, a.Name)
+	}
+
+	return nil, fmt.Errorf("no matching asset for %s/%s in release %s (assets: %s)", runtime.GOOS, runtime.GOARCH, release.TagName, strings.Join(names, ", "))
 }
 
 // downloadAndInstall downloads the binary for the current platform and replaces the current one
-func downloadAndInstall(version string) error {
-	// Determine platform-specific archive name
-	archiveName := getArchiveName(version)
-	downloadURL := fmt.Sprintf("%s/v%s/%s", githubReleaseBase, version, archiveName)
+func downloadAndInstall(asset *releaseAsset) error {
+	if asset == nil {
+		return fmt.Errorf("no release asset provided")
+	}
+
+	downloadURL := asset.BrowserDownloadURL
+	nameLower := strings.ToLower(asset.Name)
+	tmpPattern := "fifi-update-*.tar.gz"
+	if strings.HasSuffix(nameLower, ".zip") {
+		tmpPattern = "fifi-update-*.zip"
+	}
 
 	// Get the path to the current executable
 	exePath, err := os.Executable()
@@ -125,8 +199,8 @@ func downloadAndInstall(version string) error {
 		return fmt.Errorf("download failed with status %d. URL: %s", resp.StatusCode, downloadURL)
 	}
 
-	// Create temporary file for archive
-	tmpFile, err := os.CreateTemp("", "fifi-update-*")
+	// Create temporary file for archive (keep extension so we pick the right extractor)
+	tmpFile, err := os.CreateTemp("", tmpPattern)
 	if err != nil {
 		return fmt.Errorf("failed to create temp file: %w", err)
 	}
@@ -163,35 +237,6 @@ func downloadAndInstall(version string) error {
 	}
 
 	return nil
-}
-
-// getArchiveName returns the platform-specific archive name for downloads
-// Format: fifi_{version}_{os}_{arch}.{tar.gz|zip}
-func getArchiveName(version string) string {
-	osName := runtime.GOOS
-	arch := runtime.GOARCH
-
-	// Map OS names to release naming convention
-	switch osName {
-	case "darwin":
-		osName = "macOS"
-	case "linux":
-		osName = "linux"
-	case "windows":
-		osName = "windows"
-	}
-
-	// Map architecture names
-	if arch == "amd64" {
-		arch = "amd64"
-	} else if arch == "arm64" {
-		arch = "arm64"
-	}
-
-	if runtime.GOOS == "windows" {
-		return fmt.Sprintf("fifi_%s_%s_%s.zip", version, osName, arch)
-	}
-	return fmt.Sprintf("fifi_%s_%s_%s.tar.gz", version, osName, arch)
 }
 
 // extractBinary extracts the fifi binary from a tar.gz or zip archive
