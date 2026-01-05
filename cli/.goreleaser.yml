@@ -36,11 +36,8 @@ builds:
 
 archives:
   - id: fifi
+    format: tar.gz
     format_overrides:
-      - goos: linux
-        format: tar.gz
-      - goos: darwin
-        format: tar.gz
       - goos: windows
         format: zip
     name_template: >-
