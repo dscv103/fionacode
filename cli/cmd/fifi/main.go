@@ -23,6 +23,12 @@ It packages the FionaCode configuration (opencode.json) and all associated
 prompts and tools, making it easy to start new projects with a proven
 multi-agent AI development framework.`,
 	Version: Version,
+	PersistentPreRun: func(cmd *cobra.Command, args []string) {
+		// Check for updates (except for the update command itself to avoid recursion)
+		if cmd.Name() != "update" && cmd.Name() != "version" {
+			checkForUpdates()
+		}
+	},
 }
 
 func init() {

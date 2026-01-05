@@ -81,6 +81,16 @@ fifi validate /path/to/project
 fifi version
 ```
 
+### Update to the latest version
+
+Update fifi to the latest version from GitHub releases:
+
+```bash
+fifi update
+```
+
+The CLI will also notify you when a new version is available when you run any command.
+
 ## Next Steps After Installation
 
 After running `fifi init`, you'll need to:
@@ -167,6 +177,7 @@ cli/
 ├── cmd/fifi/              # CLI entry point
 │   ├── main.go           # Root command
 │   ├── init.go           # Init command
+│   ├── update.go         # Update command
 │   └── validate.go       # Validate command
 ├── internal/
 │   ├── assets/           # Embedded assets

@@ -7,6 +7,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+- `update` command to update fifi to the latest version from GitHub releases
+- Automatic update notification when running commands (except `update` and `version`)
+- Cross-platform self-update functionality for Linux, macOS, and Windows
+- Version comparison logic to detect when newer versions are available
+
+### Changed
+- Root command now includes `PersistentPreRun` hook for update checking
+- README updated with update command documentation
+
 ## [0.1.2] - 2026-01-04
 
 ### Added
