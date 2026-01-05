@@ -1,0 +1,87 @@
+{
+  "description": "Configuration to disable all tools and MCP servers globally. Individual agents can override by setting specific tools to true in their agent config.",
+  
+  "tools": {
+    "read": false,
+    "edit": false,
+    "bash": false,
+    "search": false,
+    "list": false,
+    "webfetch": false,
+    "task_tracker": false,
+    "exit_criteria_checker": false,
+    "branch_strategy_enforcer": false,
+    "agent_handoff_validator": false,
+    "type_check_aggregator": false,
+    "coverage_analyzer": false,
+    "test_runner_smart": false,
+    "fixture_generator": false,
+    "code_complexity_scorer": false,
+    "docstring_validator": false,
+    "api_diff_reporter": false,
+    "dependency_auditor": false,
+    "changelog_generator": false,
+    "smart_commit_builder": false,
+    "flakiness_detector": false,
+    "github_*": false
+  },
+  
+  "mcp": {
+    "github": {
+      "type": "remote",
+      "url": "https://api.githubcopilot.com/mcp/",
+      "oauth": false,
+      "headers": {
+        "Authorization": "Bearer {env:GITHUB_MCP_PAT}"
+      },
+      "enabled": false
+    },
+    "context7": {
+      "type": "remote",
+      "url": "https://context7.modelcontextprotocol.io/v1",
+      "oauth": false,
+      "enabled": false,
+      "headers": {
+        "Authorization": "Bearer {env:CONTEXT7_API_KEY}"
+      }
+    },
+    "filesystem": {
+      "type": "local",
+      "command": ["npx", "-y", "@modelcontextprotocol/server-filesystem", "."],
+      "enabled": false,
+      "timeout": 5000
+    },
+    "sqlite": {
+      "type": "local",
+      "command": [
+        "npx",
+        "-y",
+        "@modelcontextprotocol/server-sqlite",
+        "--db-path",
+        ".opencode/state/metadata.db"
+      ],
+      "enabled": false,
+      "timeout": 5000
+    }
+  },
+  
+  "agents": {
+    "_comment": "Example: To enable specific tools for an agent, override in the agent's tools section",
+    "_example": {
+      "description": "Example agent with selective tool access",
+      "mode": "subagent",
+      "temperature": 0.2,
+      "prompt": ".opencode/prompts/example.txt",
+      "tools": {
+        "read": true,
+        "search": true,
+        "coverage_analyzer": true
+      },
+      "permissions": {
+        "edit": "deny",
+        "bash": "deny",
+        "webfetch": "deny"
+      }
+    }
+  }
+}

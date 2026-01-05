@@ -23,7 +23,6 @@
         "webfetch": "ask"
       }
     },
-
     "implementer": {
       "description": "Implements subtasks: generates Python 3.13+ code, adds typing, writes pytest tests, runs checks, and prepares changes for review.",
       "mode": "subagent",
@@ -46,7 +45,6 @@
         "webfetch": "deny"
       }
     },
-
     "code-review": {
       "description": "Read-only reviewer: validates requirements, code quality, tests, typing, and decides approve vs revision with structured feedback.",
       "mode": "subagent",
@@ -71,7 +69,6 @@
         "webfetch": "deny"
       }
     },
-
     "planning": {
       "description": "Plans approach and architecture without making changes; produces task breakdowns, risks, and acceptance criteria for orchestrator.",
       "mode": "subagent",
@@ -92,7 +89,6 @@
         "webfetch": "ask"
       }
     },
-
     "web-research": {
       "description": "Finds and summarizes external docs (APIs, libraries, standards), pulling citations/links and mapping them to implementation guidance.",
       "mode": "subagent",
@@ -113,7 +109,6 @@
         "webfetch": "allow"
       }
     },
-
     "file-navigator": {
       "description": "Fast codebase exploration: locate files/symbols, trace call paths, inventory modules, and report where changes should land.",
       "mode": "subagent",
@@ -132,7 +127,6 @@
         "webfetch": "deny"
       }
     },
-
     "executor": {
       "description": "Runs commands/tests/linters locally and reports failures with minimal reproduction steps; does not author code unless instructed.",
       "mode": "subagent",
@@ -153,7 +147,6 @@
         "webfetch": "deny"
       }
     },
-
     "security-review": {
       "description": "Security-focused review: input validation, authz/authn flows, secrets, dependency risks, and safe defaults.",
       "mode": "subagent",
@@ -174,7 +167,6 @@
         "webfetch": "ask"
       }
     },
-
     "docs": {
       "description": "Writes/updates docs (README, usage guides, docstrings, examples) consistent with current behavior; minimal or no bash usage.",
       "mode": "subagent",
@@ -195,7 +187,6 @@
         "webfetch": "deny"
       }
     },
-
     "compliance": {
       "description": "Checks policy/standards alignment (style rules, licensing notes, data handling constraints) and flags gaps for orchestrator.",
       "mode": "subagent",
@@ -216,7 +207,6 @@
         "webfetch": "deny"
       }
     },
-
     "diagnostics": {
       "description": "Deep failure analysis: triages test failures, type errors, runtime traces; proposes root cause and a targeted fix plan.",
       "mode": "subagent",
@@ -239,7 +229,6 @@
         "webfetch": "deny"
       }
     },
-
     "refactoring": {
       "description": "Improves structure/maintainability: reduces duplication, simplifies APIs, clarifies naming, and preserves behavior with tests.",
       "mode": "subagent",
@@ -259,7 +248,6 @@
         "webfetch": "deny"
       }
     },
-
     "integration": {
       "description": "Handles cross-cutting integration work: wiring modules, configs, CI steps, packaging, and release/PR hygiene tasks.",
       "mode": "subagent",
@@ -284,7 +272,6 @@
         "webfetch": "ask"
       }
     },
-
     "communication": {
       "description": "Produces human-facing artifacts: PR descriptions, changelogs, release notes, status updates, and decision logs.",
       "mode": "subagent",
@@ -309,11 +296,9 @@
       }
     }
   },
-
   "tools": {
     "github_*": false
   },
-
   "mcp": {
     "github": {
       "type": "remote",
@@ -335,9 +320,25 @@
     },
     "filesystem": {
       "type": "local",
-      "command": ["npx", "-y", "@modelcontextprotocol/server-filesystem", "."],
+      "command": [
+        "npx",
+        "-y",
+        "@modelcontextprotocol/server-filesystem",
+        "."
+      ],
       "enabled": true,
       "timeout": 5000
+    },
+    "code-reasoning": {
+      "type": "local",
+      "command": [
+        "node",
+        "/home/dscv/Repositories/mcp-sequentialthinking-tools/dist/index.js"
+      ],
+      "enabled": true,
+      "environment": {
+        "MAX_HISTORY_SIZE": "1000"
+      }
     },
     "sqlite": {
       "type": "local",
