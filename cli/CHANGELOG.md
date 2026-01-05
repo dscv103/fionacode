@@ -27,7 +27,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - N/A (initial release)
 
 ### Fixed
-- N/A (initial release)
+- Corrected JSON structure from "agents" to "agent" in opencode.json configuration
+- Updated validation code to properly recognize "agent" field instead of "agents"
+- Fixed embedded template to use correct "agent" key
 
 ### Security
 - N/A (initial release)
