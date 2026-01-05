@@ -1,5 +1,5 @@
 {
-  "agents": {
+  "agent": {
     "orchestrator": {
       "description": "Primary coordinator: decomposes the user request into subtasks + file list, delegates to subagents, manages iteration until exit criteria are met.",
       "mode": "primary",

@@ -9,7 +9,7 @@ import (
 
 // OpencodeConfig represents the structure of opencode.json
 type OpencodeConfig struct {
-	Agents     map[string]Agent     `json:"agents"`
+	Agent      map[string]Agent     `json:"agent"`
 	Tools      map[string]bool      `json:"tools"`
 	MCPServers map[string]MCPServer `json:"mcpServers"`
 }
@@ -59,8 +59,8 @@ func Validate(targetDir string) error {
 	}
 
 	// Validate structure
-	if len(config.Agents) == 0 {
-		return fmt.Errorf("no agents defined in opencode.json")
+	if len(config.Agent) == 0 {
+		return fmt.Errorf("no agent defined in opencode.json")
 	}
 
 	// Check if .opencode directory exists
@@ -81,8 +81,8 @@ func Validate(targetDir string) error {
 		return fmt.Errorf(".opencode/tool directory not found in %s", targetDir)
 	}
 
-	// Validate that prompt files referenced in agents exist
-	for agentName, agent := range config.Agents {
+	// Validate that prompt files referenced in agent exist
+	for agentName, agent := range config.Agent {
 		if agent.Prompt != "" {
 			promptPath := filepath.Join(targetDir, agent.Prompt)
 			if _, err := os.Stat(promptPath); os.IsNotExist(err) {
@@ -116,7 +116,7 @@ func GetSummary(targetDir string) (string, error) {
 	}
 
 	summary := fmt.Sprintf("Configuration Summary:\n")
-	summary += fmt.Sprintf("  Agents: %d\n", len(config.Agents))
+	summary += fmt.Sprintf("  Agent: %d\n", len(config.Agent))
 	summary += fmt.Sprintf("  MCP Servers: %d\n", len(config.MCPServers))
 
 	// Count enabled and disabled tools
