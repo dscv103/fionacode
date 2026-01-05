@@ -7,17 +7,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-### Added
-- `update` command to update fifi to the latest version from GitHub releases
-- Automatic update notification when running commands (except `update` and `version`)
-- Cross-platform self-update functionality for Linux, macOS, and Windows
-- Version comparison logic to detect when newer versions are available
+## [0.1.4] - 2026-01-05
 
-### Changed
-- Root command now includes `PersistentPreRun` hook for update checking
-- README updated with update command documentation
+### Fixed
+- Fixed install script to work with simplified binary names in release archives
+- Updated goreleaser config to use simple `fifi` binary name inside archives instead of platform-specific names
 
-## [0.1.2] - 2026-01-04
+## [0.1.3] - 2026-01-05
 
 ### Added
 - Git pre-commit hook for automatic opencode.json sync between repo root and CLI embedded assets
