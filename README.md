@@ -15,6 +15,32 @@ This framework implements a **production-grade development pipeline** with:
 
 ---
 
+## Quick Start with fifi CLI
+
+The easiest way to use FionaCode is with the `fifi` CLI tool:
+
+```bash
+# Install fifi
+curl -fsSL https://raw.githubusercontent.com/dscv103/fionacode/main/cli/install.sh | bash
+
+# Initialize a new project
+mkdir my-project && cd my-project
+fifi init
+
+# Install OpenCode (if not already installed)
+curl -fsSL https://opencode.ai/install | bash
+
+# Set up API keys
+export ANTHROPIC_API_KEY="your-key-here"
+
+# Start developing!
+opencode
+```
+
+See the [CLI documentation](cli/README.md) for more details.
+
+---
+
 ## Architecture
 
 ### Agent Architecture

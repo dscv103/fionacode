@@ -1,0 +1,356 @@
+{
+  "agents": {
+    "orchestrator": {
+      "description": "Primary coordinator: decomposes the user request into subtasks + file list, delegates to subagents, manages iteration until exit criteria are met.",
+      "mode": "primary",
+      "temperature": 0.2,
+      "prompt": ".opencode/prompts/orchestrator.txt",
+      "tools": {
+        "read": true,
+        "edit": true,
+        "bash": true,
+        "search": true,
+        "list": true,
+        "webfetch": true,
+        "task_tracker": true,
+        "exit_criteria_checker": true,
+        "branch_strategy_enforcer": true,
+        "agent_handoff_validator": true
+      },
+      "permissions": {
+        "edit": "ask",
+        "bash": "ask",
+        "webfetch": "ask"
+      }
+    },
+    "implementer": {
+      "description": "Implements subtasks: generates Python 3.13+ code, adds typing, writes pytest tests, runs checks, and prepares changes for review.",
+      "mode": "subagent",
+      "temperature": 0.3,
+      "prompt": ".opencode/prompts/implementer.txt",
+      "tools": {
+        "read": true,
+        "edit": true,
+        "bash": true,
+        "search": true,
+        "list": true,
+        "type_check_aggregator": true,
+        "coverage_analyzer": true,
+        "test_runner_smart": true,
+        "fixture_generator": true
+      },
+      "permissions": {
+        "edit": "allow",
+        "bash": "allow",
+        "webfetch": "deny"
+      }
+    },
+    "code-review": {
+      "description": "Read-only reviewer: validates requirements, code quality, tests, typing, and decides approve vs revision with structured feedback.",
+      "mode": "subagent",
+      "temperature": 0.1,
+      "prompt": ".opencode/prompts/code-review.txt",
+      "tools": {
+        "read": true,
+        "edit": false,
+        "bash": true,
+        "coverage_analyzer": true,
+        "type_check_aggregator": true,
+        "exit_criteria_checker": true,
+        "search": true,
+        "list": true,
+        "code_complexity_scorer": true,
+        "docstring_validator": true,
+        "api_diff_reporter": true
+      },
+      "permissions": {
+        "edit": "deny",
+        "bash": "allow",
+        "webfetch": "deny"
+      }
+    },
+    "planning": {
+      "description": "Plans approach and architecture without making changes; produces task breakdowns, risks, and acceptance criteria for orchestrator.",
+      "mode": "subagent",
+      "temperature": 0.2,
+      "prompt": ".opencode/prompts/planning.txt",
+      "tools": {
+        "read": true,
+        "edit": false,
+        "bash": true,
+        "search": true,
+        "list": true,
+        "webfetch": true,
+        "task_tracker": true
+      },
+      "permissions": {
+        "edit": "deny",
+        "bash": "ask",
+        "webfetch": "ask"
+      }
+    },
+    "web-research": {
+      "description": "Finds and summarizes external docs (APIs, libraries, standards), pulling citations/links and mapping them to implementation guidance.",
+      "mode": "subagent",
+      "temperature": 0.2,
+      "prompt": ".opencode/prompts/web-research.txt",
+      "tools": {
+        "read": true,
+        "edit": false,
+        "bash": false,
+        "search": false,
+        "list": false,
+        "webfetch": true,
+        "github_*": true
+      },
+      "permissions": {
+        "edit": "deny",
+        "bash": "deny",
+        "webfetch": "allow"
+      }
+    },
+    "file-navigator": {
+      "description": "Fast codebase exploration: locate files/symbols, trace call paths, inventory modules, and report where changes should land.",
+      "mode": "subagent",
+      "temperature": 0.1,
+      "prompt": ".opencode/prompts/file-navigator.txt",
+      "tools": {
+        "read": true,
+        "edit": false,
+        "bash": false,
+        "search": true,
+        "list": true
+      },
+      "permissions": {
+        "edit": "deny",
+        "bash": "deny",
+        "webfetch": "deny"
+      }
+    },
+    "executor": {
+      "description": "Runs commands/tests/linters locally and reports failures with minimal reproduction steps; does not author code unless instructed.",
+      "mode": "subagent",
+      "temperature": 0.1,
+      "prompt": ".opencode/prompts/executor.txt",
+      "tools": {
+        "read": true,
+        "coverage_analyzer": true,
+        "edit": false,
+        "bash": true,
+        "search": true,
+        "list": true,
+        "flakiness_detector": true
+      },
+      "permissions": {
+        "edit": "deny",
+        "bash": "allow",
+        "webfetch": "deny"
+      }
+    },
+    "security-review": {
+      "description": "Security-focused review: input validation, authz/authn flows, secrets, dependency risks, and safe defaults.",
+      "mode": "subagent",
+      "temperature": 0.1,
+      "prompt": ".opencode/prompts/security-review.txt",
+      "tools": {
+        "read": true,
+        "edit": false,
+        "bash": true,
+        "search": true,
+        "list": true,
+        "webfetch": true,
+        "dependency_auditor": true
+      },
+      "permissions": {
+        "edit": "deny",
+        "bash": "ask",
+        "webfetch": "ask"
+      }
+    },
+    "docs": {
+      "description": "Writes/updates docs (README, usage guides, docstrings, examples) consistent with current behavior; minimal or no bash usage.",
+      "mode": "subagent",
+      "temperature": 0.3,
+      "prompt": ".opencode/prompts/docs.txt",
+      "tools": {
+        "read": true,
+        "edit": true,
+        "bash": false,
+        "search": true,
+        "list": true,
+        "webfetch": false,
+        "docstring_validator": true
+      },
+      "permissions": {
+        "edit": "allow",
+        "bash": "deny",
+        "webfetch": "deny"
+      }
+    },
+    "compliance": {
+      "description": "Checks policy/standards alignment (style rules, licensing notes, data handling constraints) and flags gaps for orchestrator.",
+      "mode": "subagent",
+      "temperature": 0.1,
+      "prompt": ".opencode/prompts/compliance.txt",
+      "tools": {
+        "read": true,
+        "edit": false,
+        "bash": false,
+        "search": true,
+        "list": true,
+        "webfetch": false,
+        "dependency_auditor": true
+      },
+      "permissions": {
+        "edit": "deny",
+        "bash": "deny",
+        "webfetch": "deny"
+      }
+    },
+    "diagnostics": {
+      "description": "Deep failure analysis: triages test failures, type errors, runtime traces; proposes root cause and a targeted fix plan.",
+      "mode": "subagent",
+      "temperature": 0.1,
+      "prompt": ".opencode/prompts/diagnostics.txt",
+      "tools": {
+        "read": true,
+        "edit": false,
+        "bash": true,
+        "coverage_analyzer": true,
+        "type_check_aggregator": true,
+        "test_runner_smart": true,
+        "search": true,
+        "list": true,
+        "flakiness_detector": true
+      },
+      "permissions": {
+        "edit": "deny",
+        "bash": "allow",
+        "webfetch": "deny"
+      }
+    },
+    "refactoring": {
+      "description": "Improves structure/maintainability: reduces duplication, simplifies APIs, clarifies naming, and preserves behavior with tests.",
+      "mode": "subagent",
+      "temperature": 0.2,
+      "prompt": ".opencode/prompts/refactoring.txt",
+      "tools": {
+        "read": true,
+        "edit": true,
+        "bash": true,
+        "search": true,
+        "list": true,
+        "code_complexity_scorer": true
+      },
+      "permissions": {
+        "edit": "ask",
+        "bash": "ask",
+        "webfetch": "deny"
+      }
+    },
+    "integration": {
+      "description": "Handles cross-cutting integration work: wiring modules, configs, CI steps, packaging, and release/PR hygiene tasks.",
+      "mode": "subagent",
+      "temperature": 0.2,
+      "prompt": ".opencode/prompts/integration.txt",
+      "tools": {
+        "read": true,
+        "edit": true,
+        "bash": true,
+        "search": true,
+        "list": true,
+        "webfetch": true,
+        "github_*": true,
+        "dependency_auditor": true,
+        "changelog_generator": true,
+        "smart_commit_builder": true,
+        "branch_strategy_enforcer": true
+      },
+      "permissions": {
+        "edit": "ask",
+        "bash": "ask",
+        "webfetch": "ask"
+      }
+    },
+    "communication": {
+      "description": "Produces human-facing artifacts: PR descriptions, changelogs, release notes, status updates, and decision logs.",
+      "mode": "subagent",
+      "temperature": 0.3,
+      "prompt": ".opencode/prompts/communication.txt",
+      "tools": {
+        "read": true,
+        "edit": true,
+        "bash": false,
+        "search": true,
+        "list": true,
+        "webfetch": false,
+        "github_*": true,
+        "changelog_generator": true,
+        "api_diff_reporter": true,
+        "smart_commit_builder": true
+      },
+      "permissions": {
+        "edit": "allow",
+        "bash": "deny",
+        "webfetch": "deny"
+      }
+    }
+  },
+  "tools": {
+    "github_*": false
+  },
+  "mcp": {
+    "github": {
+      "type": "remote",
+      "url": "https://api.githubcopilot.com/mcp/",
+      "oauth": false,
+      "headers": {
+        "Authorization": "Bearer {env:GITHUB_MCP_PAT}"
+      },
+      "enabled": true
+    },
+    "context7": {
+      "type": "remote",
+      "url": "https://context7.modelcontextprotocol.io/v1",
+      "oauth": false,
+      "enabled": true,
+      "headers": {
+        "Authorization": "Bearer {env:CONTEXT7_API_KEY}"
+      }
+    },
+    "filesystem": {
+      "type": "local",
+      "command": [
+        "npx",
+        "-y",
+        "@modelcontextprotocol/server-filesystem",
+        "."
+      ],
+      "enabled": true,
+      "timeout": 5000
+    },
+    "code-reasoning": {
+      "type": "local",
+      "command": [
+        "node",
+        "/home/dscv/Repositories/mcp-sequentialthinking-tools/dist/index.js"
+      ],
+      "enabled": true,
+      "environment": {
+        "MAX_HISTORY_SIZE": "1000"
+      }
+    },
+    "sqlite": {
+      "type": "local",
+      "command": [
+        "npx",
+        "-y",
+        "@modelcontextprotocol/server-sqlite",
+        "--db-path",
+        ".opencode/state/metadata.db"
+      ],
+      "enabled": true,
+      "timeout": 5000
+    }
+  }
+}

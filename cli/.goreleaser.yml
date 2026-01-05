@@ -1,0 +1,78 @@
+project_name: fifi
+
+before:
+  hooks:
+    - go mod download
+    - go mod tidy
+
+builds:
+  - id: fifi
+    main: ./cmd/fifi
+    binary: fifi
+    env:
+      - CGO_ENABLED=0
+    goos:
+      - linux
+      - darwin
+      - windows
+    goarch:
+      - amd64
+      - arm64
+    ldflags:
+      - -s -w
+      - -X main.Version={{.Version}}
+      - -X main.BuildDate={{.Date}}
+
+archives:
+  - id: fifi
+    format: tar.gz
+    name_template: >-
+      {{ .ProjectName }}_
+      {{- .Version }}_
+      {{- if eq .Os "darwin" }}macOS
+      {{- else }}{{ .Os }}{{ end }}_
+      {{- .Arch }}
+    format_overrides:
+      - goos: windows
+        format: zip
+    files:
+      - README.md
+      - LICENSE*
+
+checksum:
+  name_template: 'checksums.txt'
+
+snapshot:
+  name_template: "{{ incpatch .Version }}-next"
+
+changelog:
+  sort: asc
+  filters:
+    exclude:
+      - '^docs:'
+      - '^test:'
+      - '^chore:'
+      - 'typo'
+
+release:
+  github:
+    owner: dscv103
+    name: fionacode
+  draft: false
+  prerelease: auto
+  name_template: "{{.ProjectName}} v{{.Version}}"
+
+brews:
+  - name: fifi
+    repository:
+      owner: dscv103
+      name: homebrew-fifi
+      branch: main
+    folder: Formula
+    homepage: https://github.com/dscv103/fionacode
+    description: "FionaCode CLI - Initialize OpenCode AI projects"
+    license: MIT
+    test: |
+      system "#{bin}/fifi version"
+    install: |
+      bin.install "fifi"
