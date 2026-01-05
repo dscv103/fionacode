@@ -21,6 +21,13 @@
         "edit": "ask",
         "bash": "ask",
         "webfetch": "ask"
+      },
+      "mcp": {
+        "github": true,
+        "context7": true,
+        "motherduck": true,
+        "filesystem": true,
+        "code-reasoning": true
       }
     },
     "implementer": {
@@ -43,6 +50,13 @@
         "edit": "allow",
         "bash": "allow",
         "webfetch": "deny"
+      },
+      "mcp": {
+        "github": true,
+        "context7": true,
+        "motherduck": true,
+        "filesystem": true,
+        "code-reasoning": true
       }
     },
     "code-review": {
@@ -67,6 +81,13 @@
         "edit": "deny",
         "bash": "allow",
         "webfetch": "deny"
+      },
+      "mcp": {
+        "github": true,
+        "context7": true,
+        "motherduck": true,
+        "filesystem": true,
+        "code-reasoning": true
       }
     },
     "planning": {
@@ -87,6 +108,13 @@
         "edit": "deny",
         "bash": "ask",
         "webfetch": "ask"
+      },
+      "mcp": {
+        "github": true,
+        "context7": true,
+        "motherduck": true,
+        "filesystem": true,
+        "code-reasoning": true
       }
     },
     "web-research": {
@@ -107,6 +135,13 @@
         "edit": "deny",
         "bash": "deny",
         "webfetch": "allow"
+      },
+      "mcp": {
+        "github": true,
+        "context7": true,
+        "motherduck": false,
+        "filesystem": false,
+        "code-reasoning": true
       }
     },
     "file-navigator": {
@@ -125,6 +160,13 @@
         "edit": "deny",
         "bash": "deny",
         "webfetch": "deny"
+      },
+      "mcp": {
+        "github": false,
+        "context7": false,
+        "motherduck": true,
+        "filesystem": true,
+        "code-reasoning": false
       }
     },
     "executor": {
@@ -145,6 +187,13 @@
         "edit": "deny",
         "bash": "allow",
         "webfetch": "deny"
+      },
+      "mcp": {
+        "github": false,
+        "context7": false,
+        "motherduck": true,
+        "filesystem": true,
+        "code-reasoning": false
       }
     },
     "security-review": {
@@ -165,6 +214,13 @@
         "edit": "deny",
         "bash": "ask",
         "webfetch": "ask"
+      },
+      "mcp": {
+        "github": true,
+        "context7": true,
+        "motherduck": true,
+        "filesystem": true,
+        "code-reasoning": true
       }
     },
     "docs": {
@@ -185,6 +241,13 @@
         "edit": "allow",
         "bash": "deny",
         "webfetch": "deny"
+      },
+      "mcp": {
+        "github": true,
+        "context7": true,
+        "motherduck": true,
+        "filesystem": true,
+        "code-reasoning": false
       }
     },
     "compliance": {
@@ -205,6 +268,13 @@
         "edit": "deny",
         "bash": "deny",
         "webfetch": "deny"
+      },
+      "mcp": {
+        "github": true,
+        "context7": true,
+        "motherduck": true,
+        "filesystem": true,
+        "code-reasoning": true
       }
     },
     "diagnostics": {
@@ -227,6 +297,13 @@
         "edit": "deny",
         "bash": "allow",
         "webfetch": "deny"
+      },
+      "mcp": {
+        "github": true,
+        "context7": true,
+        "motherduck": true,
+        "filesystem": true,
+        "code-reasoning": true
       }
     },
     "refactoring": {
@@ -246,6 +323,13 @@
         "edit": "ask",
         "bash": "ask",
         "webfetch": "deny"
+      },
+      "mcp": {
+        "github": true,
+        "context7": true,
+        "motherduck": true,
+        "filesystem": true,
+        "code-reasoning": true
       }
     },
     "integration": {
@@ -270,6 +354,13 @@
         "edit": "ask",
         "bash": "ask",
         "webfetch": "ask"
+      },
+      "mcp": {
+        "github": true,
+        "context7": true,
+        "motherduck": true,
+        "filesystem": true,
+        "code-reasoning": true
       }
     },
     "communication": {
@@ -293,6 +384,13 @@
         "edit": "allow",
         "bash": "deny",
         "webfetch": "deny"
+      },
+      "mcp": {
+        "github": true,
+        "context7": false,
+        "motherduck": false,
+        "filesystem": true,
+        "code-reasoning": false
       }
     }
   },
@@ -311,12 +409,26 @@
     },
     "context7": {
       "type": "remote",
-      "url": "https://context7.modelcontextprotocol.io/v1",
+      "url": "https://mcp.context7.com/mcp",
       "oauth": false,
       "enabled": true,
       "headers": {
         "Authorization": "Bearer {env:CONTEXT7_API_KEY}"
       }
+    },
+    "motherduck": {
+      "type": "local",
+      "command": [
+        "npx",
+        "-y",
+        "@motherduckdb/mcp-server-motherduck"
+      ],
+      "enabled": true,
+      "timeout": 10000,
+      "environment": {
+        "MOTHERDUCK_TOKEN": "{env:MOTHERDUCK_TOKEN}"
+      },
+      "note": "Query and analyze data with MotherDuck and local DuckDB. For cloud features, set MOTHERDUCK_TOKEN environment variable. Works locally without token for file-based DuckDB."
     },
     "filesystem": {
       "type": "local",
@@ -339,18 +451,6 @@
       "environment": {
         "MAX_HISTORY_SIZE": "1000"
       }
-    },
-    "sqlite": {
-      "type": "local",
-      "command": [
-        "npx",
-        "-y",
-        "@modelcontextprotocol/server-sqlite",
-        "--db-path",
-        ".opencode/state/metadata.db"
-      ],
-      "enabled": true,
-      "timeout": 5000
     }
   }
 }
