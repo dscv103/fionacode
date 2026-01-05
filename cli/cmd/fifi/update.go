@@ -1,6 +1,9 @@
 package main
 
 import (
+	"archive/tar"
+	"archive/zip"
+	"compress/gzip"
 	"fmt"
 	"io"
 	"net/http"
@@ -95,9 +98,9 @@ func getLatestVersion() (string, error) {
 
 // downloadAndInstall downloads the binary for the current platform and replaces the current one
 func downloadAndInstall(version string) error {
-	// Determine platform-specific binary name
-	binaryName := getBinaryName()
-	downloadURL := fmt.Sprintf("%s/v%s/%s", githubReleaseBase, version, binaryName)
+	// Determine platform-specific archive name
+	archiveName := getArchiveName(version)
+	downloadURL := fmt.Sprintf("%s/v%s/%s", githubReleaseBase, version, archiveName)
 
 	// Get the path to the current executable
 	exePath, err := os.Executable()
@@ -111,7 +114,7 @@ func downloadAndInstall(version string) error {
 		return fmt.Errorf("failed to resolve symlinks: %w", err)
 	}
 
-	// Download the new binary
+	// Download the archive
 	resp, err := http.Get(downloadURL)
 	if err != nil {
 		return fmt.Errorf("failed to download: %w", err)
@@ -122,7 +125,7 @@ func downloadAndInstall(version string) error {
 		return fmt.Errorf("download failed with status %d. URL: %s", resp.StatusCode, downloadURL)
 	}
 
-	// Create temporary file
+	// Create temporary file for archive
 	tmpFile, err := os.CreateTemp("", "fifi-update-*")
 	if err != nil {
 		return fmt.Errorf("failed to create temp file: %w", err)
@@ -137,17 +140,24 @@ func downloadAndInstall(version string) error {
 	}
 	tmpFile.Close()
 
-	// Make temp file executable
-	if err := os.Chmod(tmpPath, 0755); err != nil {
-		return fmt.Errorf("failed to make temp file executable: %w", err)
+	// Extract binary from archive
+	binaryPath, err := extractBinary(tmpPath)
+	if err != nil {
+		return fmt.Errorf("failed to extract binary: %w", err)
+	}
+	defer os.Remove(binaryPath)
+
+	// Make binary executable
+	if err := os.Chmod(binaryPath, 0755); err != nil {
+		return fmt.Errorf("failed to make binary executable: %w", err)
 	}
 
 	// Replace the current binary
 	// On Unix-like systems, we can rename while the file is in use
 	// On Windows, we may need a different approach
-	if err := os.Rename(tmpPath, exePath); err != nil {
+	if err := os.Rename(binaryPath, exePath); err != nil {
 		// If rename fails, try copying
-		if err := copyFile(tmpPath, exePath); err != nil {
+		if err := copyFile(binaryPath, exePath); err != nil {
 			return fmt.Errorf("failed to replace binary: %w", err)
 		}
 	}
@@ -155,30 +165,127 @@ func downloadAndInstall(version string) error {
 	return nil
 }
 
-// getBinaryName returns the platform-specific binary name for downloads
-func getBinaryName() string {
+// getArchiveName returns the platform-specific archive name for downloads
+// Format: fifi_{version}_{os}_{arch}.{tar.gz|zip}
+func getArchiveName(version string) string {
 	osName := runtime.GOOS
 	arch := runtime.GOARCH
 
-	// Map to the naming convention used in releases
-	if osName == "darwin" {
-		osName = "Darwin"
-	} else if osName == "linux" {
-		osName = "Linux"
-	} else if osName == "windows" {
-		osName = "Windows"
+	// Map OS names to release naming convention
+	switch osName {
+	case "darwin":
+		osName = "macOS"
+	case "linux":
+		osName = "linux"
+	case "windows":
+		osName = "windows"
 	}
 
+	// Map architecture names
 	if arch == "amd64" {
-		arch = "x86_64"
+		arch = "amd64"
 	} else if arch == "arm64" {
 		arch = "arm64"
 	}
 
 	if runtime.GOOS == "windows" {
-		return fmt.Sprintf("fifi_%s_%s.exe", osName, arch)
+		return fmt.Sprintf("fifi_%s_%s_%s.zip", version, osName, arch)
 	}
-	return fmt.Sprintf("fifi_%s_%s", osName, arch)
+	return fmt.Sprintf("fifi_%s_%s_%s.tar.gz", version, osName, arch)
+}
+
+// extractBinary extracts the fifi binary from a tar.gz or zip archive
+func extractBinary(archivePath string) (string, error) {
+	if strings.HasSuffix(archivePath, ".zip") {
+		return extractFromZip(archivePath)
+	}
+	return extractFromTarGz(archivePath)
+}
+
+// extractFromTarGz extracts the fifi binary from a tar.gz archive
+func extractFromTarGz(archivePath string) (string, error) {
+	file, err := os.Open(archivePath)
+	if err != nil {
+		return "", err
+	}
+	defer file.Close()
+
+	gzr, err := gzip.NewReader(file)
+	if err != nil {
+		return "", err
+	}
+	defer gzr.Close()
+
+	tr := tar.NewReader(gzr)
+
+	for {
+		header, err := tr.Next()
+		if err == io.EOF {
+			break
+		}
+		if err != nil {
+			return "", err
+		}
+
+		// Look for the fifi binary
+		if header.Name == "fifi" || filepath.Base(header.Name) == "fifi" {
+			// Create temp file for extracted binary
+			tmpFile, err := os.CreateTemp("", "fifi-binary-*")
+			if err != nil {
+				return "", err
+			}
+			tmpPath := tmpFile.Name()
+
+			if _, err := io.Copy(tmpFile, tr); err != nil {
+				tmpFile.Close()
+				os.Remove(tmpPath)
+				return "", err
+			}
+			tmpFile.Close()
+
+			return tmpPath, nil
+		}
+	}
+
+	return "", fmt.Errorf("fifi binary not found in archive")
+}
+
+// extractFromZip extracts the fifi binary from a zip archive
+func extractFromZip(archivePath string) (string, error) {
+	r, err := zip.OpenReader(archivePath)
+	if err != nil {
+		return "", err
+	}
+	defer r.Close()
+
+	for _, f := range r.File {
+		// Look for the fifi.exe binary
+		if f.Name == "fifi.exe" || filepath.Base(f.Name) == "fifi.exe" {
+			rc, err := f.Open()
+			if err != nil {
+				return "", err
+			}
+			defer rc.Close()
+
+			// Create temp file for extracted binary
+			tmpFile, err := os.CreateTemp("", "fifi-binary-*.exe")
+			if err != nil {
+				return "", err
+			}
+			tmpPath := tmpFile.Name()
+
+			if _, err := io.Copy(tmpFile, rc); err != nil {
+				tmpFile.Close()
+				os.Remove(tmpPath)
+				return "", err
+			}
+			tmpFile.Close()
+
+			return tmpPath, nil
+		}
+	}
+
+	return "", fmt.Errorf("fifi.exe binary not found in archive")
 }
 
 // copyFile copies a file from src to dst
