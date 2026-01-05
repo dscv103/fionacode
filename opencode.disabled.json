@@ -45,16 +45,17 @@
     "motherduck": {
       "type": "local",
       "command": [
-        "npx",
-        "-y",
-        "@motherduckdb/mcp-server-motherduck"
+        "uvx",
+        "mcp-server-motherduck",
+        "--db-path",
+        ":memory:"
       ],
       "enabled": false,
       "timeout": 10000,
       "environment": {
-        "MOTHERDUCK_TOKEN": "{env:MOTHERDUCK_TOKEN}"
+        "motherduck_token": "{env:MOTHERDUCK_TOKEN}"
       },
-      "note": "Query and analyze data with MotherDuck and local DuckDB. For cloud features, set MOTHERDUCK_TOKEN environment variable. Works locally without token for file-based DuckDB."
+      "note": "Query and analyze data with MotherDuck and local DuckDB. For cloud features, set MOTHERDUCK_TOKEN environment variable (lowercase 'motherduck_token'). Works locally without token for file-based DuckDB."
     },
     "filesystem": {
       "type": "local",
