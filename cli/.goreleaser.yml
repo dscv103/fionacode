@@ -62,17 +62,18 @@ release:
   prerelease: auto
   name_template: "{{.ProjectName}} v{{.Version}}"
 
-brews:
-  - name: fifi
-    repository:
-      owner: dscv103
-      name: homebrew-fifi
-      branch: main
-    directory: Formula
-    homepage: https://github.com/dscv103/fionacode
-    description: "FionaCode CLI - Initialize OpenCode AI projects"
-    license: MIT
-    test: |
-      system "#{bin}/fifi version"
-    install: |
-      bin.install "fifi"
+# Homebrew tap - uncomment when homebrew-fifi repository is created
+# brews:
+#   - name: fifi
+#     repository:
+#       owner: dscv103
+#       name: homebrew-fifi
+#       branch: main
+#     directory: Formula
+#     homepage: https://github.com/dscv103/fionacode
+#     description: "FionaCode CLI - Initialize OpenCode AI projects"
+#     license: MIT
+#     test: |
+#       system "#{bin}/fifi version"
+#     install: |
+#       bin.install "fifi"
