@@ -113,7 +113,7 @@ export function limitOutputSize(
   maxSize: number = MAX_OUTPUT_SIZE
 ): { output: string; truncated: boolean } {
   const sizeInBytes = Buffer.byteLength(output, 'utf8');
-  
+
   if (sizeInBytes <= maxSize) {
     return { output, truncated: false };
   }
@@ -121,13 +121,13 @@ export function limitOutputSize(
   // Calculate how much to keep (leave room for warning message)
   const warningMessage = `\n\n... [Output truncated: ${sizeInBytes} bytes > ${maxSize} bytes limit] ...`;
   const keepSize = maxSize - Buffer.byteLength(warningMessage, 'utf8');
-  
+
   // Truncate to byte boundary
   let truncated = output;
   while (Buffer.byteLength(truncated, 'utf8') > keepSize) {
     truncated = truncated.slice(0, truncated.length - 1);
   }
-  
+
   return {
     output: truncated + warningMessage,
     truncated: true,
@@ -172,11 +172,11 @@ export function parseConventionalCommit(message: string): {
 } {
   const lines = message.split('\n');
   const firstLine = lines[0];
-  
+
   // Match: type(scope)!: description or type!: description or type(scope): description or type: description
   const conventionalRegex = /^(\w+)(?:\(([^)]+)\))?(!)?:\s*(.+)$/;
   const match = firstLine.match(conventionalRegex);
-  
+
   if (!match) {
     return {
       type: 'unknown',
@@ -186,16 +186,16 @@ export function parseConventionalCommit(message: string): {
   }
 
   const [, type, scope, breakingMarker, description] = match;
-  
+
   // Extract body and footer
   let body: string | undefined;
   let footer: string | undefined;
-  
+
   if (lines.length > 2) {
     const bodyLines: string[] = [];
     const footerLines: string[] = [];
     let inFooter = false;
-    
+
     for (let i = 2; i < lines.length; i++) {
       const line = lines[i];
       // Footer starts with "BREAKING CHANGE:" or "token: value" format
@@ -205,14 +205,14 @@ export function parseConventionalCommit(message: string): {
       ) {
         inFooter = true;
       }
-      
+
       if (inFooter) {
         footerLines.push(line);
       } else {
         bodyLines.push(line);
       }
     }
-    
+
     if (bodyLines.length > 0) {
       body = bodyLines.join('\n').trim();
     }
@@ -220,9 +220,9 @@ export function parseConventionalCommit(message: string): {
       footer = footerLines.join('\n').trim();
     }
   }
-  
+
   // Check for breaking changes
-  const breaking = 
+  const breaking =
     breakingMarker === '!' ||
     (footer?.includes('BREAKING CHANGE:') || footer?.includes('BREAKING-CHANGE:')) ||
     false;
