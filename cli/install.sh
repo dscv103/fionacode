@@ -62,10 +62,12 @@ install_binary() {
     echo -e "${GREEN}Installing ${BINARY_NAME} ${version} for ${platform}...${NC}"
     
     # Construct download URL
+    # Remove 'v' prefix from version for archive name
+    version_without_v="${version#v}"
     if [[ "$platform" == "windows_"* ]]; then
-        archive_name="${BINARY_NAME}_${version}_${platform}.zip"
+        archive_name="${BINARY_NAME}_${version_without_v}_${platform}.zip"
     else
-        archive_name="${BINARY_NAME}_${version}_${platform}.tar.gz"
+        archive_name="${BINARY_NAME}_${version_without_v}_${platform}.tar.gz"
     fi
     
     download_url="https://github.com/${REPO}/releases/download/${version}/${archive_name}"
